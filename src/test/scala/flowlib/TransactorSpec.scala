@@ -3,8 +3,6 @@ package tests
 
 import org.scalatest._
 
-abstract class Testing extends FlatSpec with Matchers with concurrent.AsyncAssertions // with concurrent.Conductors 
-
 class TransactorSpec extends Testing {
   import Transaction._
 
@@ -58,34 +56,5 @@ class TransactorSpec extends Testing {
     damage shouldBe limit
     shots should be >= damage
     println(s"damage/shots=$damage/$shots")
-  }
-
-  import java.util.concurrent.atomic.AtomicInteger
-  import java.util.concurrent.ThreadLocalRandom
-
-  def transCannons(cannons: Int, damageLimit: Int, shotLimit: Int)( target: (Int, Waiter, AtomicInteger) => Unit): (Int, Int) = {
-    val damage = new AtomicInteger(0)
-    val shots  = new AtomicInteger(0)
-    val w = new Waiter
-
-    val battery = for( c <- 0 until cannons ) yield {
-      new Thread {
-        override def run: Unit = {
-          while( damage.get < damageLimit && shots.get < shotLimit ) {
-            val s = shots.getAndIncrement
-            val i = ThreadLocalRandom.current.nextInt(0, damageLimit)
-            // println(s"> $s $i ${damage.get} ${shots.get}")
-            target(i, w, damage)
-            // println(s"< $s $i ${damage.get} ${shots.get}")
-          }
-          w.dismiss
-        }
-      }
-    }
-
-    for( c <- battery ) c.start
-    w.await(dismissals(cannons))
-
-    (damage.get, shots.get)
   }
 }

@@ -2,51 +2,32 @@ package flowlib
 
 import java.util.{Timer, TimerTask, Date}
 
-trait Timing {
+object Timing {
   object timer extends Timer(true)
 
   implicit class TimerThunk( k: => Unit ) extends TimerTask {
     def run = k
   }
 
-  def idle[T]( delay: Long, t: T=()): Process[T] = {
-    import Process._
+  def after( delay: Long): Process[Unit] = 
+    Process.waitFor(k => timer.schedule(k(()), delay))
 
-    val slug = new Responder[T] {
-      def respond( k: T => Unit ): Unit = timer.schedule(k(t), delay)
-    }
+  def at( time: Long): Process[Unit] = 
+    Process.waitFor(k => timer.schedule(k(()), new Date(time)))
 
-    receive(slug)(stop(_))
+  trait Ticker {
+    def nextTick: Process[Long]
   }
 
-  def delayLine[T](delay: Long): Gate[T, T] = new Gate[T, T] {
-    private val underlying = Gate.queue[T]()
-    def accept(t: T): Unit = timer.schedule(underlying accept t, delay)
-    def respond( k: T => Unit) = underlying respond k
+  def repeatAfter( delay: Long, period: Long) = new Ticker {
+    private val b = Gate.barrier()
+    timer.schedule(b signal (()), delay, period)
+    def nextTick = Process.waitFor(b.take)
   }
 
-  def after[T]( delay: Long, t: T=()): Responder[T] = {
-    val o = Gate.observable[T]()
-    timer.schedule(o accept Some(t), delay)
-    o
-  }
-
-  def at[T]( time: Long, t: T=()): Responder[T] = {
-    val o = Gate.observable[T]()
-    timer.schedule(o accept Some(t), new Date(time))
-    o
-  }
-  def repeatAfter[T]( delay: Long, period: Long, t: T=()): Responder[T] = {
-    val o = Gate.barrier()
-    timer.schedule(o accept (()), delay, period)
-    o map { _ => t }
-  }
-
-  def repeatAt[T]( time: Long, period: Long, t: T=()): Responder[T] = {
-    val o = Gate.barrier()
-    timer.scheduleAtFixedRate(o accept (()), new Date(time), period)
-    o map { _ => t }
+  def repeatAt[T]( time: Long, period: Long) = new Ticker {
+    private val b = Gate.barrier()
+    timer.scheduleAtFixedRate(b signal (()), new Date(time), period)
+    def nextTick = Process.waitFor(b.take)
   }
 }
-
-object Timing extends Timing

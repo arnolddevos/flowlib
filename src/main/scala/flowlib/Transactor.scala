@@ -3,6 +3,7 @@ package flowlib
 import scala.collection.immutable.Queue
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
+import Transaction._
 
 trait Transaction[T] {
   def transition: T => Option[T]
@@ -10,7 +11,8 @@ trait Transaction[T] {
 }
 
 trait Transactor[T] {
-  def accept(r: Transaction[T]): Unit
+  def run(r: Transaction[T]): Unit
+  def transact(pf: PartialFunction[T, T])(k: T => Unit) = run(transaction(pf)(k))
 }
 
 object Transaction {
@@ -42,19 +44,12 @@ object Transaction {
 }
 
 object Transactor {
-  import Transaction._
-
-  implicit class TranactorOps[T](val self: Transactor[T]) extends AnyVal {
-    def transact(pf: PartialFunction[T, T])(k: T => Unit) =
-      self.accept(transaction[T](pf)(k))
-  }
-
   def apply[T](t0: T) = new Transactor[T] {
 
     private case class State(t: T, rs: List[Transaction[T]])
     private val cell = new AtomicReference(State(t0, Nil))
 
-    def accept( r: Transaction[T] ): Unit = {
+    def run( r: Transaction[T] ): Unit = {
 
       type Tr = Transaction[T]
       type Th = (T, Tr)
