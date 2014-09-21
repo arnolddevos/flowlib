@@ -9,14 +9,21 @@ object ProcessUtil {
     (p0 >>= { u => g signal Some(u); stop(u) }) & stop(Waiting(g.take))
   }
 
-  def join[A, B](pa: Process[A], pb: Process[B]): Process[(A,B)] = {
-    background(pa) >>= { pa1 =>
-      pb >>= {  b =>
-        pa1 >>= { a =>
-          stop((a, b))
+  def join[A, B]: Process[A] => Process[B] => Process[(A,B)] = {
+    pa => pb =>
+      background(pa) >>= { pa1 =>
+        pb >>= {  b =>
+          pa1 >>= { a =>
+            stop((a, b))
+          }
         }
       }
-    }
+  }
+
+  def cat[A]: Process[A] => (A => Process[Unit]) => Process[Nothing] = {
+    source => sink =>
+      def loop: Process[Nothing] = (source >>= sink) >> loop
+      loop
   }
 
   def fanout[T]( members: List[T => Process[Unit]]): T => Process[Unit] = { t =>
