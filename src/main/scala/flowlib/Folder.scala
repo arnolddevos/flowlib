@@ -1,16 +1,20 @@
 package flowlib
 
-trait Folder[T] { parent =>
+trait Folder[+T] { parent =>
+
   def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S]
+
   def map[U](g: T => U) = new Folder[U] {
     def apply[S](s0: S)(f: (S, U) => Process[S]) =
       parent.apply(s0)((s, t) => f(s, g(t)))
   }
+
   def flatMap[U](g: T => Folder[U]) = new Folder[U] {
     def apply[S](s0: S)(f: (S, U) => Process[S]) = {
       parent.apply(s0)((s, t) => g(t)(s)(f))
     }
   }
+
   def andThen[U](g: T => Process[U]) = new Folder[U] {
     def apply[S](s0: S)(f: (S, U) => Process[S]) =
       parent.apply(s0)((s, t) => g(t) >>= (f(s, _)))
@@ -22,6 +26,10 @@ object Folder {
 
   def constant[T](t: T) = new Folder[T] {
     def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S] = f(s0, t)
+  }
+
+  def empty = new Folder[Nothing] {
+    def apply[S](s0: S)(f: (S, Nothing) => Process[S]): Process[S] = Process.stop(s0)
   }
 
   def stream[T](fold: Folder[T]): (Option[T] => Process[Unit]) => Process[Unit] = { sink =>
