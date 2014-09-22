@@ -6,6 +6,11 @@ trait Folder[T] { parent =>
     def apply[S](s0: S)(f: (S, U) => Process[S]) =
       parent.apply(s0)((s, t) => f(s, g(t)))
   }
+  def flatMap[U](g: T => Folder[U]) = new Folder[U] {
+    def apply[S](s0: S)(f: (S, U) => Process[S]) = {
+      parent.apply(s0)((s, t) => g(t)(s)(f))
+    }
+  }
   def andThen[U](g: T => Process[U]) = new Folder[U] {
     def apply[S](s0: S)(f: (S, U) => Process[S]) =
       parent.apply(s0)((s, t) => g(t) >>= (f(s, _)))
