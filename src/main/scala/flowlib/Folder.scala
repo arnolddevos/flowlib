@@ -4,6 +4,9 @@ trait Folder[+T] { parent =>
 
   def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S]
 
+  def iterate( f: T => Process[Unit] ): Process[Unit] =
+    apply(())((_, t) => f(t))
+
   def map[U](g: T => U) = new Folder[U] {
     def apply[S](s0: S)(f: (S, U) => Process[S]) =
       parent.apply(s0)((s, t) => f(s, g(t)))
@@ -29,11 +32,21 @@ object Folder {
   }
 
   def empty = new Folder[Nothing] {
-    def apply[S](s0: S)(f: (S, Nothing) => Process[S]): Process[S] = Process.stop(s0)
+    def apply[S](s0: S)(f: (S, Nothing) => Process[S]): Process[S] = stop(s0)
   }
 
-  def stream[T](fold: Folder[T]): (Option[T] => Process[Unit]) => Process[Unit] = { sink =>
-    fold(())((_, t) => sink(Some(t))) >> sink(None)
+  def fold[T](ts0: List[T]) = new Folder[T] {
+    def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S] = {
+      def loop(s: S, ts: List[T]): Process[S] = ts match {
+        case t :: ts1 => f(s, t) >>= (s1 => loop(s1, ts1)) 
+        case Nil => stop(s)
+      }
+      loop(s0, ts0)
+    }
+  }
+
+  def stream[T](ts: Folder[T]): (Option[T] => Process[Unit]) => Process[Unit] = { sink =>
+    ts.iterate( t => sink(Some(t))) >> sink(None)
   }
 
   def unstream[T](source: Process[Option[T]]) = new Folder[T] {

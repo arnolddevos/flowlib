@@ -8,10 +8,21 @@ object Wiring extends Wiring
  * See also Graphs and Builder for a more complex alternative.
  */
 trait Wiring {
+  import Process.waitFor, ProcessUtil.fanout
+
   implicit class FlowNode[G, S](fn: G => S) {
     def ->:[G1](g: G1)(implicit ev: FlowIn[G1, G]): S = fn(ev.gate(g))
     def :->[G1](g: G1)(implicit ev: FlowOut[G1,G]): S = fn(ev.gate(g))
   }
+
+  def tee[G, A](gs: G*)(implicit e: FlowOut[G, A => Process[Unit]]) = 
+    fanout(gs.toList map (e.gate(_)))
+
+  def right[G, A, B](g :G)(implicit e: FlowOut[G, Either[A, B] => Process[Unit]]): B => Process[Unit] = 
+    b => e.gate(g)(Right(b))
+
+  def left[G, A, B](g :G)(implicit e: FlowOut[G, Either[A, B] => Process[Unit]]): A => Process[Unit] = 
+    a => e.gate(g)(Left(a))
 
   trait FlowIn[G1,G] { def gate(g: G1): G }
   trait FlowOut[G1,G] { def gate(g: G1): G }
@@ -25,18 +36,18 @@ trait Wiring {
   }
 
   implicit def gateIn[A, B] = new FlowIn[Gate[A, B], Process[B]] {
-    def gate(g: Gate[A, B]): Process[B] = Process.waitFor(g.take)
+    def gate(g: Gate[A, B]): Process[B] = waitFor(g.take)
   }
 
   implicit def gateOut[A, B] = new FlowOut[Gate[A, B], A => Process[Unit]] {
-    def gate(g: Gate[A, B]): A => Process[Unit] = a => Process.waitFor(k => g.offer(a)(k(())))
+    def gate(g: Gate[A, B]): A => Process[Unit] = a => waitFor(k => g.offer(a)(k(())))
   }
 
   implicit def cbIn[A] = new FlowIn[(A => Unit) => Unit, Process[A]] {
-    def gate(cb: (A => Unit) => Unit): Process[A] = Process.waitFor(cb)
+    def gate(cb: (A => Unit) => Unit): Process[A] = waitFor(cb)
   }
 
   implicit def cbOut[A] = new FlowOut[A => (=> Unit) => Unit, A => Process[Unit]] {
-    def gate(cb: A => (=> Unit) => Unit): A => Process[Unit] = a => Process.waitFor(k => cb(a)(k(())))
+    def gate(cb: A => (=> Unit) => Unit): A => Process[Unit] = a => waitFor(k => cb(a)(k(())))
   }
 }
