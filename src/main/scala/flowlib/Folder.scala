@@ -35,13 +35,22 @@ object Folder {
     def apply[S](s0: S)(f: (S, Nothing) => Process[S]): Process[S] = stop(s0)
   }
 
-  def fold[T](ts0: List[T]) = new Folder[T] {
+  def sequence[T](ts0: List[T]) = new Folder[T] {
     def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S] = {
       def loop(s: S, ts: List[T]): Process[S] = ts match {
         case t :: ts1 => f(s, t) >>= (s1 => loop(s1, ts1)) 
         case Nil => stop(s)
       }
       loop(s0, ts0)
+    }
+  }
+
+  def repeat[T](n0: Int)(p: Process[T]) = new Folder[T] {
+    def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S] = {
+      def loop(s: S, n: Int): Process[S] = 
+        if(n > 0) p >>= (f(s, _)) >>= (loop(_, n-1))
+        else stop(s)
+      loop(s0, n0)
     }
   }
 

@@ -2,7 +2,7 @@ package flowlib
 
 object ProcessUtil {
   import Process._
-  import scala.collection.immutable.Queue
+  import Folder._
 
   def background[U](p0: Process[U]): Process[Process[U]] = {
     val g = Gate.observable[U]()
@@ -21,16 +21,13 @@ object ProcessUtil {
   }
 
   def cat[A]: Process[A] => (A => Process[Unit]) => Process[Nothing] = {
-    source => sink =>
-      def loop: Process[Nothing] = (source >>= sink) >> loop
+    source => sink => 
+      def loop: Process[Nothing] = (source >>= sink) >> loop 
       loop
   }
 
-  def fanout[T]( members: List[T => Process[Unit]]): T => Process[Unit] = { t =>
-    def loop(members: List[T => Process[Unit]]): Process[Unit] = members match {
-      case member :: rest => member(t) >> loop(rest)
-      case Nil => stop(())
-    }
-    loop(members)
+  def fanout[T]( sinks: List[T => Process[Unit]]): T => Process[Unit] = { 
+    t =>
+      sequence(sinks).iterate(sink => sink(t))
   }
 }
