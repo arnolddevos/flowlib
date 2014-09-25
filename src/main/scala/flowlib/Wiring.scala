@@ -10,23 +10,23 @@ object Wiring extends Wiring
 trait Wiring {
   import Process.waitFor, ProcessUtil.fanout
 
-  implicit class FlowNode[G, S](fn: G => S) {
-    def ->:[G1](g: G1)(implicit ev: FlowIn[G1, G]): S = fn(ev.gate(g))
-    def :->[G1](g: G1)(implicit ev: FlowOut[G1,G]): S = fn(ev.gate(g))
+  implicit class FlowNode[G2, S](fn: G2 => S) {
+    def ->:[G1, G <: G2](g: G1)(implicit ev: FlowIn[G1, G]): S = fn(ev.gate(g))
+    def :->[G1, G <: G2](g: G1)(implicit ev: FlowOut[G1,G]): S = fn(ev.gate(g))
   }
 
   def tee[G, A](gs: G*)(implicit e: FlowOut[G, A => Process[Unit]]) = 
     fanout(gs.toList map (e.gate(_)))
 
-  def right[G, G1, B](g :G)(implicit e: FlowOut[G, G1], f: G1 <:< (Either[Nothing, B] => Process[Unit])): B => Process[Unit] = 
+  def right[G1, G2, B](g :G1)(implicit e: FlowOut[G1, G2], f: G2 <:< (Either[Nothing, B] => Process[Unit])): B => Process[Unit] = 
     b => f(e.gate(g))(Right(b))
 
-  def left[G, G1, A](g :G)(implicit e: FlowOut[G, G1], f: G1 <:< (Either[A, Nothing] => Process[Unit])): A => Process[Unit] = 
+  def left[G1, G2, A](g :G1)(implicit e: FlowOut[G1, G2], f: G2 <:< (Either[A, Nothing] => Process[Unit])): A => Process[Unit] = 
     a => f(e.gate(g))(Left(a))
 
-  trait FlowIn[G1,G] { def gate(g: G1): G }
+  trait FlowIn[G1,G2] { def gate(g: G1): G2 }
 
-  trait FlowOut[G1,G] { def gate(g: G1): G }
+  trait FlowOut[G1,G2] { def gate(g: G1): G2 }
 
   implicit def flowIn[A] = new FlowIn[Process[A], Process[A]] {
     def gate(g: Process[A]) = g
