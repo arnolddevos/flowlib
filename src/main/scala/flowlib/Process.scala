@@ -45,6 +45,6 @@ object Process {
     def >>[V]( step: => Process[V]): Process[V] = Sequential(p0, (_:U) => step)
     def &[V](step: => Process[V]): Process[V] = Sequential(Parallel(p0), (_: Any) => step)
     def !:(name: String): Process[U] = Named(name, p0)
-    def run() = (new DefaultSite {}) run p0
+    def run() = (new DefaultSite) run p0
   }
 }

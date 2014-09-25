@@ -55,7 +55,7 @@ trait Site {
   def run[U](p0: Process[U]): Unit = bounce(p0, p0)(success(p0, _))
 }
 
-trait DefaultSite extends Site {
+class DefaultSite extends Site {
   def executor: ExecutorService = new ForkJoinPool
   def success[U](p0: Process[U], u: U): Unit =
     println(s"Completed $p0 with: $u")
@@ -68,5 +68,3 @@ trait DefaultSite extends Site {
     if(c != null) s"$e cause: $c" else e.toString
   }
 }
-
-object Site extends DefaultSite
