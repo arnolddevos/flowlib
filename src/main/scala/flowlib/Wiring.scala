@@ -10,48 +10,51 @@ object Wiring extends Wiring
 trait Wiring {
   import Process.waitFor, ProcessUtil.fanout
 
+  type Source[+T]       = Process[T]
+  type Sink[-T]         = T => Process[Unit]
+
   implicit class FlowNode[G2, S](fn: G2 => S) {
     def ->:[G1, G <: G2](g: G1)(implicit ev: FlowIn[G1, G]): S = fn(ev.gate(g))
     def :->[G1, G <: G2](g: G1)(implicit ev: FlowOut[G1,G]): S = fn(ev.gate(g))
   }
 
-  def tee[G, A](gs: G*)(implicit e: FlowOut[G, A => Process[Unit]]) = 
+  def tee[G, A](gs: G*)(implicit e: FlowOut[G, Sink[A]]) = 
     fanout(gs.toList map (e.gate(_)))
 
-  def compose[G, A, B](f: B => A)(g: G)(implicit e: FlowOut[G, A => Process[Unit]]): B => Process[Unit] = 
+  def compose[G, A, B](f: B => A)(g: G)(implicit e: FlowOut[G, Sink[A]]): Sink[B] = 
     e.gate(g) compose f
 
-  def right[G1, G2, B](g :G1)(implicit e: FlowOut[G1, G2], f: G2 <:< (Either[Nothing, B] => Process[Unit])): B => Process[Unit] = 
+  def right[G1, G2, B](g :G1)(implicit e: FlowOut[G1, G2], f: G2 <:< Sink[Either[Nothing, B]]): Sink[B] = 
     b => f(e.gate(g))(Right(b))
 
-  def left[G1, G2, A](g :G1)(implicit e: FlowOut[G1, G2], f: G2 <:< (Either[A, Nothing] => Process[Unit])): A => Process[Unit] = 
+  def left[G1, G2, A](g :G1)(implicit e: FlowOut[G1, G2], f: G2 <:< Sink[Either[A, Nothing]]): Sink[A] = 
     a => f(e.gate(g))(Left(a))
 
   trait FlowIn[G1,G2] { def gate(g: G1): G2 }
 
   trait FlowOut[G1,G2] { def gate(g: G1): G2 }
 
-  implicit def flowIn[A] = new FlowIn[Process[A], Process[A]] {
-    def gate(g: Process[A]) = g
+  implicit def flowIn[A] = new FlowIn[Source[A], Source[A]] {
+    def gate(g: Source[A]) = g
   }
 
-  implicit def flowOut[A] = new FlowOut[A => Process[Unit], A => Process[Unit]] {
-    def gate(g: A => Process[Unit]) = g
+  implicit def flowOut[A] = new FlowOut[Sink[A], Sink[A]] {
+    def gate(g: Sink[A]) = g
   }
 
-  implicit def gateIn[A, B] = new FlowIn[Gate[A, B], Process[B]] {
-    def gate(g: Gate[A, B]): Process[B] = waitFor(g.take)
+  implicit def gateIn[A, B] = new FlowIn[Gate[A, B], Source[B]] {
+    def gate(g: Gate[A, B]): Source[B] = waitFor(g.take)
   }
 
-  implicit def gateOut[A, B] = new FlowOut[Gate[A, B], A => Process[Unit]] {
-    def gate(g: Gate[A, B]): A => Process[Unit] = a => waitFor(k => g.offer(a)(k(())))
+  implicit def gateOut[A, B] = new FlowOut[Gate[A, B], Sink[A]] {
+    def gate(g: Gate[A, B]): Sink[A] = a => waitFor(k => g.offer(a)(k(())))
   }
 
-  implicit def cbIn[A] = new FlowIn[(A => Unit) => Unit, Process[A]] {
-    def gate(cb: (A => Unit) => Unit): Process[A] = waitFor(cb)
+  implicit def cbIn[A] = new FlowIn[(A => Unit) => Unit, Source[A]] {
+    def gate(cb: (A => Unit) => Unit): Source[A] = waitFor(cb)
   }
 
-  implicit def cbOut[A] = new FlowOut[A => (=> Unit) => Unit, A => Process[Unit]] {
-    def gate(cb: A => (=> Unit) => Unit): A => Process[Unit] = a => waitFor(k => cb(a)(k(())))
+  implicit def cbOut[A] = new FlowOut[A => (=> Unit) => Unit, Sink[A]] {
+    def gate(cb: A => (=> Unit) => Unit): Sink[A] = a => waitFor(k => cb(a)(k(())))
   }
 }
