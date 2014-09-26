@@ -18,6 +18,9 @@ trait Wiring {
   def tee[G, A](gs: G*)(implicit e: FlowOut[G, A => Process[Unit]]) = 
     fanout(gs.toList map (e.gate(_)))
 
+  def compose[G, A, B](f: B => A)(g: G)(implicit e: FlowOut[G, A => Process[Unit]]): B => Process[Unit] = 
+    e.gate(g) compose f
+
   def right[G1, G2, B](g :G1)(implicit e: FlowOut[G1, G2], f: G2 <:< (Either[Nothing, B] => Process[Unit])): B => Process[Unit] = 
     b => f(e.gate(g))(Right(b))
 
