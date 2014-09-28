@@ -18,10 +18,10 @@ trait Wiring {
     def :->[G1, G <: G2](g: G1)(implicit ev: FlowOut[G1,G]): S = fn(ev.gate(g))
   }
 
-  def tee[G, A](gs: G*)(implicit e: FlowOut[G, Sink[A]]) = 
-    fanout(gs.toList map (e.gate(_)))
+  def tee[G1, G2, A](g1: G1, g2: G2)(implicit e1: FlowOut[G1, Sink[A]], e2: FlowOut[G2, Sink[A]]) = 
+    fanout(List(e1.gate(g1), e2.gate(g2)))
 
-  def compose[G, A, B](f: B => A)(g: G)(implicit e: FlowOut[G, Sink[A]]): Sink[B] = 
+  def compose[G, A, B](g: G)(f: A => B)(implicit e: FlowOut[G, Sink[B]]): Sink[A] = 
     e.gate(g) compose f
 
   def right[G1, G2, B](g :G1)(implicit e: FlowOut[G1, G2], f: G2 <:< Sink[Either[Nothing, B]]): Sink[B] = 
