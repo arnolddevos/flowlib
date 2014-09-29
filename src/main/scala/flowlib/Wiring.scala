@@ -8,7 +8,7 @@ object Wiring extends Wiring
  * See also Graphs and Builder for a more complex alternative.
  */
 trait Wiring {
-  import Process.waitFor, ProcessUtil.fanout
+  import Process.{waitFor, stop}, ProcessUtil.fanout
 
   type Source[+T]       = Process[T]
   type Sink[-T]         = T => Process[Unit]
@@ -17,6 +17,21 @@ trait Wiring {
     def ->:[G1, G <: G2](g: G1)(implicit ev: FlowIn[G1, G]): S = fn(ev.gate(g))
     def :->[G1, G <: G2](g: G1)(implicit ev: FlowOut[G1,G]): S = fn(ev.gate(g))
   }
+
+  implicit class FlowNodes[G2, S](fns: List[G2 => S]) {
+    def ->:[G1, G <: G2](g: G1)(implicit ev: FlowIn[G1, G]): List[S] = 
+      fns map(fn => fn(ev.gate(g)))
+    def :->[G1, G <: G2](g: G1)(implicit ev: FlowOut[G1,G]): List[S] = 
+      fns map(fn => fn(ev.gate(g)))
+  }
+
+  implicit class ProcessesNode[A](ps: List[Process[A]]) {
+    def &[B](p: Process[B]): Process[B] = 
+      ps.reduceLeftOption(_ & _) map (_ & p) getOrElse p
+    def &[B >: A](ps1: List[Process[B]]): List[Process[B]] = 
+      ps ::: ps1
+  }
+
 
   def tee[G1, G2, A](g1: G1, g2: G2)(implicit e1: FlowOut[G1, Sink[A]], e2: FlowOut[G2, Sink[A]]) = 
     fanout(List(e1.gate(g1), e2.gate(g2)))
