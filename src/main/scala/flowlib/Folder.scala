@@ -1,10 +1,12 @@
 package flowlib
 
+import Wiring.{Source, Sink}
+
 trait Folder[+T] { parent =>
 
   def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S]
 
-  def iterate( f: T => Process[Unit] ): Process[Unit] =
+  def iterate( f: Sink[T] ): Process[Unit] =
     apply(())((_, t) => f(t))
 
   def map[U](g: T => U) = new Folder[U] {
@@ -54,11 +56,21 @@ object Folder {
     }
   }
 
-  def stream[T](ts: Folder[T]): (Option[T] => Process[Unit]) => Process[Unit] = { sink =>
-    ts.iterate( t => sink(Some(t))) >> sink(None)
+  def each[T](source: Source[T]) = new Folder[T] {
+    def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S] = {
+      def loop(s: S): Process[S] = source >>= (f(s, _)) >>= loop
+      loop(s0)
+    }
   }
 
-  def unstream[T](source: Process[Option[T]]) = new Folder[T] {
+  type Streamed[+T] = Option[T]
+
+  def stream[T](ts: Folder[T]): Sink[Streamed[T]] => Process[Unit] = { 
+    sink =>
+      ts.iterate( t => sink(Some(t))) >> sink(None)
+  }
+
+  def unstream[T](source: Source[Streamed[T]]) = new Folder[T] {
     def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S] = {
       def loop(s: S): Process[S] = source >>= {
         case Some(t) => f(s, t) >>= loop
