@@ -58,7 +58,7 @@ object Folder {
 
   def each[T](source: Source[T]) = new Folder[T] {
     def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S] = {
-      def loop(s: S): Process[S] = source >>= (f(s, _)) >>= loop
+      def loop(s: S): Process[Nothing] = source >>= (f(s, _)) >>= loop
       loop(s0)
     }
   }
