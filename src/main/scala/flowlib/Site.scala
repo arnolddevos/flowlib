@@ -51,7 +51,11 @@ trait Site {
   private def push[V, U](p0: Process[V], p: Process[U])(k: U => Unit): Unit =
     bounce(p0, p)(k)
 
-  final def run[U](p0: Process[U]): Unit = bounce(p0, p0)(success(p0, _))
+  final def run[U](p0: Process[U]): Unit = {
+    require(! (p0.toString startsWith "Process(..."), 
+      "only named processes should run in the background")
+    bounce(p0, p0)(success(p0, _))
+  }
 }
 
 class DefaultSite extends Site {
