@@ -20,6 +20,10 @@ object ProcessUtil {
       }
   }
 
+  final def forever(p: Process[Any]): Process[Nothing] = {
+    p >> forever(p)
+  }
+
   def cat[A]: Process[A] => (A => Process[Unit]) => Process[Nothing] = {
     source => sink => 
       def loop: Process[Nothing] = (source >>= sink) >> loop 
