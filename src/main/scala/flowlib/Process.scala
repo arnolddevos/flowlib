@@ -23,9 +23,7 @@ object Process {
   case class Parallel( p1: Process[Any]) extends Process[Unit]
 
   // naming  processes
-  case class Named[U](name: String, step: Process[U]) extends Process[U] {
-    override def toString = s"Process($name)"
-  }
+  case class Named[U](name: String, step: Process[U]) extends Process[U]
 
   def process[U]( step: => Process[U]): Process[U] = Asynchronous(() => step)
 
@@ -46,5 +44,13 @@ object Process {
     def &[V](step: => Process[V]): Process[V] = Sequential(Parallel(p0), (_: Any) => step)
     def !:(name: String): Process[U] = Named(name, p0)
     def run() = (new DefaultSite) run p0
+    override def toString = s"Process(${extractName(this)})"
+  }
+
+  @annotation.tailrec
+  private def extractName(p: Process[Any], suffix:String=""): String = p match {
+    case Named(name, _) => name + suffix
+    case Sequential(p1, _) => extractName(p1, " >>= ...")
+    case _ => "..." + suffix
   }
 }

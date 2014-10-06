@@ -43,7 +43,7 @@ trait Site {
       case Waiting(respond)        => respond(k)
       case Asynchronous(step)      => async(p0, ())(_ => push(p0, step())(k))
       case Parallel(p1)            => run(p1); k(().asInstanceOf[U])
-      case Named(_, p1)            => push(p1, p1)(k)
+      case Named(_, p1)            => push(p, p1)(k)
       case Failed(e)               => failure(p0, e)
     }
   }
