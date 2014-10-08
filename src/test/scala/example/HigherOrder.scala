@@ -16,8 +16,10 @@ trait HigherOrder {
   val rows = channel[Row](backlog)
   val sums = channel[Sum](backlog)
 
-  Site run {
+  val ensemble = {
     generateRows :-> rows &
     rows ->: foldRows :-> sums
   } 
+
+  ensemble.run
 }
