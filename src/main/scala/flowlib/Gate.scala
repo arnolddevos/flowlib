@@ -6,12 +6,6 @@ trait Gate[-S, +T] {
   def signal(s: S) = offer(s)(())
 }
 
-trait Monitored {
-  def waiters: Int
-  def backlog: Int
-  def quota: Int
-}
-
 object Gate {
   import scala.collection.immutable.Queue
   import Transaction._
