@@ -6,6 +6,12 @@ trait Gate[-S, +T] {
   def signal(s: S) = offer(s)(())
 }
 
+trait Monitored {
+  def waiters: Int
+  def backlog: Int
+  def quota: Int
+}
+
 object Gate {
   import scala.collection.immutable.Queue
   import Transaction._
@@ -57,14 +63,20 @@ object Gate {
       } { _ => k }
   }
 
-  def channel[T](backlog: Int) = new Gate[T, T] {
+  trait Channel[T] extends Gate[T, T] with Monitored 
+
+  def channel[T](quota0: Int) = new Channel[T] {
     private val state = Transactor(Queue[T]())
+
+    def quota = quota0
+    def backlog = state.snapshot.length
+    def waiters = state.waiters
 
     def take( k: T => Unit): Unit =
       state.transact { case q if ! q.isEmpty => q.tail } { q => k(q.head) }
 
     def offer(t: T)(k: => Unit): Unit =
-      state.transact { case q if q.length < backlog => q enqueue t } { _ => k }
+      state.transact { case q if q.length < quota => q enqueue t } { _ => k }
   }
 
   def wye[T1, T2] = new Gate[Either[T1, T2], (T1, T2)] {

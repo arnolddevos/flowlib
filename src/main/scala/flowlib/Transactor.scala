@@ -13,6 +13,8 @@ trait Transaction[T] {
 trait Transactor[T] {
   def run(r: Transaction[T]): Unit
   def transact(pf: PartialFunction[T, T])(k: T => Unit) = run(transaction(pf)(k))
+  def waiters: Int
+  def snapshot: T
 }
 
 object Transaction {
@@ -48,6 +50,10 @@ object Transactor {
 
     private case class State(t: T, rs: List[Transaction[T]])
     private val cell = new AtomicReference(State(t0, Nil))
+
+    def waiters: Int = cell.get.rs.length
+
+    def snapshot: T = cell.get.t
 
     def run( r: Transaction[T] ): Unit = {
 
