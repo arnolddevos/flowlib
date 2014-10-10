@@ -9,6 +9,7 @@ object Wiring extends Wiring
  */
 trait Wiring {
   import Process.{waitFor, stop}, ProcessUtil.fanout
+  import Gate.Channel
 
   type Source[+T]       = Process[T]
   type Sink[-T]         = T => Process[Unit]
@@ -61,6 +62,14 @@ trait Wiring {
 
   implicit def gateOut[A, B] = new FlowOut[Gate[A, B], Sink[A]] {
     def gate(g: Gate[A, B]): Sink[A] = a => waitFor(k => g.offer(a)(k(())))
+  }
+
+  implicit def chanIn[A] = new FlowIn[Channel[A], Source[A]] {
+    def gate(g: Channel[A]): Source[A] = waitFor(g.take)
+  }
+
+  implicit def chanOut[A] = new FlowOut[Channel[A], Sink[A]] {
+    def gate(g: Channel[A]): Sink[A] = a => waitFor(k => g.offer(a)(k(())))
   }
 
   implicit def cbIn[A] = new FlowIn[(A => Unit) => Unit, Source[A]] {
