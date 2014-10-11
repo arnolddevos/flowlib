@@ -6,22 +6,26 @@ trait Monitored {
   def quota: Int
 }
 
-case class Snapshot( label: String, waiters: Int, backlog: Int, quota: Int) // ? extends Monitored
-
 object Monitored {
   import Process.{continue, stop}
   import ProcessUtil.forever
   import Timing.repeatAfter
   import Wiring.Sink
+  import Folder.sequence
 
-  def monitor(period: Long, lms: List[(String, Monitored)]): Sink[List[Snapshot]] => Process[Nothing] = {
+  case class Snapshot( label: String, stamp: Long, waiters: Int, backlog: Int, quota: Int) // ? extends Monitored
+
+  def monitor(period: Long, lms: List[(String, Monitored)]): Sink[Snapshot] => Process[Nothing] = {
     output =>
       continue(stop(repeatAfter( 0l, period))) >>= {
         tick => 
           forever {
-            tick >> output {
-              for((l, m) <- lms)
-              yield Snapshot(l, m.waiters, m.backlog, m.quota)
+            tick >> {
+              val ss =
+                for((l, m) <- lms)
+                yield Snapshot(l, System.currentTimeMillis, m.waiters, m.backlog, m.quota)
+
+              sequence(ss) iterate output
             }
           }
       }
