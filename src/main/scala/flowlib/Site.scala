@@ -54,8 +54,8 @@ trait Site {
   final def run[U](p0: Process[U]): Unit = bounce(p0, p0)(success(p0, _))
 }
 
-class DefaultSite extends Site {
-  def executor: ExecutorService = new ForkJoinPool
+class DefaultSite extends Site with Monitored {
+  val executor = new ForkJoinPool
   def success[U](p0: Process[U], u: U): Unit =
     println(s"Completed $p0 with: $u")
   def failure[U](p0: Process[U], e: Throwable): Unit = {
@@ -66,4 +66,8 @@ class DefaultSite extends Site {
     val c = e.getCause
     if(c != null) s"$e cause: $c" else e.toString
   }
+
+  def backlog = executor.getActiveThreadCount
+  def quota = executor.getParallelism
+  def waiters = executor.getQueuedTaskCount.toInt
 }
