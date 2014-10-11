@@ -17,17 +17,17 @@ object Monitored {
 
   def monitor(period: Long, lms: List[(String, Monitored)]): Sink[Snapshot] => Process[Nothing] = {
     output =>
-      continue(stop(repeatAfter( 0l, period))) >>= {
-        tick => 
-          forever {
-            tick >> {
-              val ss =
-                for((l, m) <- lms)
-                yield Snapshot(l, System.currentTimeMillis, m.waiters, m.backlog, m.quota)
+      continue {
+        val tick = repeatAfter( 0l, period)
+        forever {
+          tick >> {
+            val ss =
+              for((l, m) <- lms)
+              yield Snapshot(l, System.currentTimeMillis, m.waiters, m.backlog, m.quota)
 
-              sequence(ss) iterate output
-            }
+            sequence(ss) iterate output
           }
+        }
       }
   }
 }
