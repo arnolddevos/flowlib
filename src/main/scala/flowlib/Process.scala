@@ -29,6 +29,8 @@ object Process {
 
   def waitFor[T]( respond: (T => Unit) => Unit): Process[T] = WaitingAsync(respond)
 
+  def waitDone( respond: (=> Unit) => Unit): Process[Unit] = WaitingAsync(k => respond(k(())))
+
   def continue[U]( step: => Process[U]): Process[U] = Ready(() => step)
 
   def stop[U](u: U): Process[U] = Complete(u)
