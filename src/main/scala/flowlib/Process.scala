@@ -22,8 +22,8 @@ object Process {
   case class WaitingAsync[U]( respond: (U => Unit) => Unit) extends Process[U]
   case class Parallel( p1: Process[Any]) extends Process[Unit]
 
-  // naming  processes
-  case class Named[U](name: String, step: Process[U]) extends Process[U]
+  // metadata for the process
+  case class Decorated[U](decor: Decoration, step: Process[U]) extends Process[U]
 
   def process[U]( step: => Process[U]): Process[U] = Asynchronous(() => step)
 
@@ -44,14 +44,14 @@ object Process {
     def >>=[V]( step: U => Process[V]): Process[V] = Sequential(p0, step)
     def >>[V]( step: => Process[V]): Process[V] = Sequential(p0, (_:U) => step)
     def &[V](step: => Process[V]): Process[V] = Sequential(Parallel(p0), (_: Any) => step)
-    def !:(name: String): Process[U] = Named(name, p0)
+    def !:[D](d: D)(implicit e: IsDecor[D]): Process[U] = Decorated(e prove d, p0)
     def run() = (new DefaultSite) run p0
     override def toString = s"Process(${extractName(this)})"
   }
 
   @annotation.tailrec
   private def extractName(p: Process[Any], suffix:String=""): String = p match {
-    case Named(name, _) => name + suffix
+    case Decorated(Decoration.Name(name), _) => name + suffix
     case Sequential(p1, _) => extractName(p1, " >>= ...")
     case _ => "..." + suffix
   }
