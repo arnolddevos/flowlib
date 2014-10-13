@@ -7,51 +7,63 @@ import java.util.concurrent.{ExecutorService, ForkJoinPool}
 
 trait Site {
   import Process._
+  import Decoration._
 
   def success[U](p0: Process[U], u: U): Unit
   def failure[U](p0: Process[U], e: Throwable): Unit
   def executor: ExecutorService
 
-  private def async[V, U](p0: Process[V], u: U)(k: U => Unit): Unit = {
-    executor execute new Runnable {
-      def run: Unit = {
-        try { k(u) }
-        catch { case NonFatal(e) => failure(p0, e) }
+  private def resume[V,U](p0: Process[V], p: Process[U], retry: Boolean)(k: U => Unit): Unit = {
+
+    def async[X](x: X)(k: X => Unit): Unit = {
+      executor execute new Runnable {
+        def run: Unit = {
+          try { k(x) }
+          catch { case NonFatal(e) => fail(e) }
+        }
       }
     }
-  }
 
-  @tailrec
-  private def bounce[V, U](p0: Process[V], p: Process[U])(k: U => Unit): Unit = {
-    p match {
-
-      // most popular cases it is supposed
-      case WaitingAsync(respond)   => respond((async(p0, _)(k)))
-      case Complete(u)             => k(u)
-
-      // these cases prevent stack overflow
-      case Sequential(Complete(x), step)
-        => bounce(p0, step(x))(k)
-      case Sequential(Sequential(p1, step1), step2)
-        => bounce(p0, Sequential(p1, (x: Any) => Sequential(step1(x), step2)))(k)
-
-      // flatmap that shit
-      case Sequential(p1, step)    => push(p0, p1)(t => push(p0, step(t))(k))
-
-      // the remaining cases
-      case Ready(step)             => bounce(p0, step())(k)
-      case Waiting(respond)        => respond(k)
-      case Asynchronous(step)      => async(p0, ())(_ => push(p0, step())(k))
-      case Parallel(p1)            => run(p1); k(().asInstanceOf[U])
-      case Decorated(_, p1)        => bounce(p0, p1)(k)
-      case Failed(e)               => failure(p0, e)
+    def fail(e: Throwable): Unit = {
+      if(retry) run(p0)
+      failure(p0, e)
     }
+
+    def push(p: Process[U]): Unit = bounce(p)
+
+    @tailrec
+    def bounce(p: Process[U]): Unit = {
+      p match {
+
+        // most popular cases it is supposed
+        case WaitingAsync(respond)     => respond((async(_)(k)))
+        case Complete(u)               => k(u)
+
+        // these cases prevent stack overflow
+        case Sequential(Complete(x), step)
+          => bounce(step(x))
+        case Sequential(Sequential(p1, step1), step2)
+          => bounce(Sequential(p1, (x: Any) => Sequential(step1(x), step2)))
+
+        // flatmap that shit
+        case Sequential(p1, step)      
+          => resume(p0, p1, retry)(t => push(step(t)))
+
+        // the remaining cases
+        case Ready(step)               => bounce(step())
+        case Waiting(respond)          => respond(k)
+        case Asynchronous(step)        => async(())(_ => push(step()))
+        case Parallel(p1)              => run(p1); k(().asInstanceOf[U])
+        case Decorated(`immortal`, p1) => resume(p0, p1, true)(k)
+        case Decorated(_, p1)          => bounce(p1)
+        case Failed(e)                 => fail(e)
+      }
+    }
+
+    bounce(p)
   }
 
-  private def push[V, U](p0: Process[V], p: Process[U])(k: U => Unit): Unit =
-    bounce(p0, p)(k)
-
-  final def run(p0: Process[Any]): Unit = bounce(p0, p0)(success(p0, _))
+  final def run[U](p0: Process[U]): Unit = resume(p0, p0, false)(success(p0, _))
 }
 
 class DefaultSite extends Site with Monitored {
