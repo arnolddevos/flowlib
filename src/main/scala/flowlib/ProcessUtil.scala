@@ -29,6 +29,7 @@ object ProcessUtil {
       def loop: Process[Nothing] = (source >>= sink) >> loop 
       loop
   }
+  def sendTo[A](g: Gate[A, Any])(a: A) = waitDone(g offer a)
 
   def fanout[T]( sinks: List[T => Process[Unit]]): T => Process[Unit] = { 
     t =>
