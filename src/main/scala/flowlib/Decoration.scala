@@ -4,7 +4,8 @@ sealed trait Decoration
 
 object Decoration {
   case class Name( val text: String ) extends Decoration
-  case object immortal extends Decoration
+  case object Immortal extends Decoration
+  val immortal: Decoration = Immortal
 } 
 
 trait IsDecor[T] {
