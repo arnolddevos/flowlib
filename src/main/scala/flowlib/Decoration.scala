@@ -7,7 +7,10 @@ object Decoration {
   case object Immortal extends Decoration
   case object Mortal extends Decoration
   case class Will(x: Any) extends Decoration
+  
   val immortal: Decoration = Immortal
+  val mortal: Decoration = Mortal
+  def will(x: Any): Decoration = Will(x)
 } 
 
 trait IsDecor[T] {

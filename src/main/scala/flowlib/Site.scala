@@ -60,7 +60,7 @@ trait Site {
     bounce(p)
   }
 
-  final def run[U](p0: Process[U]): Unit = resume(p0, p0, Mortal)(success(p0, _))
+  final def run[U](p0: Process[U]): Unit = resume(p0, p0, mortal)(success(p0, _))
 }
 
 class DefaultSite extends Site with Monitored {
