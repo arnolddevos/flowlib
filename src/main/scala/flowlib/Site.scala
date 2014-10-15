@@ -9,8 +9,12 @@ trait Site {
   import Process._
   import Decoration._
 
+  // hooks
+  def started[U](p0: Process[U]): Unit
   def success[U](p0: Process[U], u: U): Unit
   def failure[U](p0: Process[U], w: Decoration, e: Throwable): Unit
+
+  // async steps are run on this
   def executor: ExecutorService
 
   private def resume[V,U](p0: Process[V], p: Process[U], w: Decoration)(k: U => Unit): Unit = {
@@ -60,13 +64,17 @@ trait Site {
     bounce(p)
   }
 
-  final def run[U](p0: Process[U]): Unit = resume(p0, p0, mortal)(success(p0, _))
+  final def run[U](p0: Process[U]): Unit = {
+    started(p0)
+    resume(p0, p0, mortal)(success(p0, _))
+  }
 }
 
 class DefaultSite extends Site with Monitored {
   import Decoration._
 
   val executor = new ForkJoinPool
+  def started[U](p0: Process[U]): Unit = ()
   def success[U](p0: Process[U], u: U): Unit =
     println(s"Completed $p0 with: $u")
   def failure[U](p0: Process[U], w: Decoration, e: Throwable): Unit = {
