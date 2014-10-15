@@ -5,6 +5,8 @@ sealed trait Decoration
 object Decoration {
   case class Name( val text: String ) extends Decoration
   case object Immortal extends Decoration
+  case object Mortal extends Decoration
+  case class Will(x: Any) extends Decoration
   val immortal: Decoration = Immortal
 } 
 
