@@ -34,15 +34,16 @@ trait Site {
         case WaitingAsync(respond)     => respond((async(_)(k)))
         case Complete(u)               => k(u)
 
-        // these cases prevent stack overflow
-        case Sequential(Complete(x), step)
-          => bounce(step(x))
-        case Sequential(Sequential(p1, step1), step2)
-          => bounce(Sequential(p1, (x: Any) => Sequential(step1(x), step2)))
-
-        // flatmap that shit
-        case Sequential(p1, step)      
-          => resume(p0, p1, retry)(t => push(step(t)))
+        // flatMap with special cases to prevent stack overflow
+        case Sequential(p1, step) =>
+          p1 match {
+            case Complete(x)  => bounce(step(x))
+            case Ready(step1) => bounce(Sequential(step1(), step))
+            case Parallel(p1) => run(p1); bounce(step(()))
+            case Sequential(p1, step1) 
+              => bounce(Sequential(p1, (x: Any) => Sequential(step1(x), step)))
+            case _            => resume(p0, p1, w)(t => push(step(t)))
+          }
 
         // the remaining cases
         case Ready(step)               => bounce(step())
