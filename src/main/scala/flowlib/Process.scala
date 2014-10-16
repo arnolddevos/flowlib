@@ -52,6 +52,7 @@ object Process {
   @annotation.tailrec
   private def extractName(p: Process[Any], suffix:String=""): String = p match {
     case Decorated(Decoration.Name(name), _) => name + suffix
+    case Parallel(p1) => extractName(p1, "& " + suffix)
     case Sequential(p1, _) => extractName(p1, " >>= ...")
     case _ => "..." + suffix
   }
