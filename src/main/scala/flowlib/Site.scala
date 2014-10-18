@@ -41,20 +41,21 @@ trait Site {
         // flatMap with special cases to prevent stack overflow
         case Sequential(p1, step) =>
           p1 match {
-            case Complete(x)  => bounce(step(x))
-            case Ready(step1) => bounce(Sequential(step1(), step))
-            case Parallel(p1) => run(p1); bounce(step(()))
-            case Sequential(p1, step1) 
-              => bounce(Sequential(p1, (x: Any) => Sequential(step1(x), step)))
-            case _            => resume(p0, p1, w)(t => push(step(t)))
+            case Complete(x)      => bounce(step(x))
+            case Ready(step1)     => bounce(Sequential(step1(), step))
+            case Parallel(p2, p3) => run(p2); bounce(Sequential(p3, step))
+            case Sequential(p2, step2) 
+              => bounce(Sequential(p2, (x: Any) => Sequential(step2(x), step)))
+            case _     
+              => resume(p0, p1, w)(t => push(step(t)))
           }
 
         // the remaining cases
         case Ready(step)               => bounce(step())
         case Waiting(respond)          => respond(k)
         case Asynchronous(step)        => async(())(_ => push(step()))
-        case Parallel(p1)              => run(p1); k(().asInstanceOf[U])
-        case Decorated(w @(Will(_)|Immortal|Mortal), p1) 
+        case Parallel(p1, p2)          => run(p1); bounce(p2)
+        case Decorated(w @(Will(_)|Immortal|Mortal), p1)
                                        => resume(p0, p1, w)(k)
         case Decorated(_, p1)          => bounce(p1)
         case Failed(e)                 => failure(p0, w, e)
@@ -64,9 +65,11 @@ trait Site {
     bounce(p)
   }
 
-  final def run[U](p0: Process[U]): Unit = {
-    started(p0)
-    resume(p0, p0, mortal)(success(p0, _))
+  final def run(p: Process[Any]): Unit = p match {
+    case Parallel(p1, p2) => run(p1); run(p2)
+    case _ => 
+      started(p)
+      resume(p, p, mortal)(success(p, _))
   }
 }
 
