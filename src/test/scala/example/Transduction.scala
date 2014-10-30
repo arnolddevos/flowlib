@@ -23,4 +23,39 @@ object Transduction extends App {
     val s = reduce(l)(r2) // s == 
     println(s)
   }
+  {
+    val l = List(1.0, 2.0, 3.0)
+    def f(s: Double, a: Double) = s*0.9 + a*0.1
+    val r = reducer(0.0)(f)
+    def take2[X] = takeN[X](2)
+    val s = transduce(l)(take2, r) // s == 
+    println(s)
+  }
+  {
+    val l = List(1.0, 2.0, 3.0)
+    def f(s: Double, a: Double) = s*0.9 + a*0.1
+    val r = reducer(0.0)(f)
+    def take2[X] = takeN[X](2)
+    def square = mapper((x: Double) => x*x) 
+    val s = transduce(l)(take2 compose square, r) // s == 
+    println(s)
+  }
+  {
+    val l = List("1.0", "2.0", "3.0")
+    val r = reducer(0.0)((s, a: Double) => s*0.9 + a*0.1)
+    val asDouble = mapper((s: String) => s.toDouble)
+    def take2[X] = takeN[X](2)
+    def square = mapper((x: Double) => x*x) 
+    val s = transduce(l)(asDouble compose take2 compose square, r) // s == 
+    println(s)
+  }
+  {
+    val l = List("1.0", "2.0", "3.0")
+    val r = reducer(0.0)((s, a: Double) => s*0.9 + a*0.1)
+    val asDouble = mapper((s: String) => s.toDouble)
+    def take2[X] = takeN[X](2)
+    def square = mapper((x: Double) => x*x) 
+    val s = transduce(l)(take2 compose asDouble compose take2 compose square, r) // s == 
+    println(s)
+  }
 }

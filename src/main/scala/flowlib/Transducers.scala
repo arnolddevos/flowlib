@@ -66,12 +66,15 @@ trait Transducers {
     def andThen[C](tc: Transducer[B, C]) = new Transducer[A, C] {
       def apply[S](fa: Reducer[A, S]) = tc(tb(fa))
     }
+    def compose[C](ta: Transducer[C, A]) = new Transducer[C, B] {
+      def apply[S](fc: Reducer[C, S]) = tb(ta(fc))
+    }
   }
 
   /**
    * Apply a Reducer of B's to a Reducible of A's using a transducer from A's to B's
    */
-  def transduce[A, B, R[_]:Reducible, S](ra: R[A], tx: Transducer[B, A], rb: Reducer[B, S]): Context[S] = 
+  def transduce[A, B, R[_]:Reducible, S](ra: R[A])(tx: Transducer[B, A], rb: Reducer[B, S]): Context[S] = 
     reduce(ra)(tx(rb))
 
   /**
