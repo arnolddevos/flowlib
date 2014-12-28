@@ -1,9 +1,9 @@
-
 package flowlib
 
 import annotation.tailrec
 import util.control.NonFatal
-import java.util.concurrent.{ExecutorService, ForkJoinPool}
+import java.util.concurrent.Executor
+import Gate.Latch
 
 trait Site {
   import Process._
@@ -15,7 +15,10 @@ trait Site {
   def failure[U](p0: Process[U], w: Decoration, e: Throwable): Unit
 
   // async steps are run on this
-  def executor: ExecutorService
+  def executor: Executor
+
+  // nondeterminism resolved by this
+  def latch[U]: Latch[U]
 
   private def resume[V,U](p0: Process[V], p: Process[U], w: Decoration)(k: U => Unit): Unit = {
 
@@ -26,6 +29,13 @@ trait Site {
           catch { case NonFatal(e) => failure(p0, w, e) }
         }
       }
+    }
+
+    def alternatives(p1: Process[U], p2: Process[U]): Unit = {
+      val l = latch[U]
+      resume(p0, p1, w) { u => l signal u }
+      resume(p0, p2, w) { u => l signal u }
+      l take k
     }
 
     def push(p: Process[U]): Unit = bounce(p)
@@ -55,6 +65,7 @@ trait Site {
         case Waiting(respond)          => respond(k)
         case Asynchronous(step)        => async(())(_ => push(step()))
         case Parallel(p1, p2)          => run(p1); bounce(p2)
+        case Alternative(p1, p2)       => alternatives(p1, p2)
         case Decorated(w @(Will(_)|Immortal|Mortal), p1)
                                        => resume(p0, p1, w)(k)
         case Decorated(_, p1)          => bounce(p1)
@@ -73,10 +84,12 @@ trait Site {
   }
 }
 
-class DefaultSite extends Site with Monitored {
+object EventMachine extends Site {
   import Decoration._
+  import Executors._
 
-  val executor = new ForkJoinPool
+  val executor = trampoline(fifo)
+  def latch[U] = Gate.latch[U]
   def started[U](p0: Process[U]): Unit = ()
   def success[U](p0: Process[U], u: U): Unit =
     println(s"Completed $p0 with: $u")
@@ -84,15 +97,11 @@ class DefaultSite extends Site with Monitored {
     println(s"Failed $p0 with: ${formatException(e)}")
     w match {
       case Immortal => run(p0)
-      case _ => executor.shutdown
+      case _ => 
     }
   }
   def formatException(e: Throwable) = {
     val c = e.getCause
     if(c != null) s"$e cause: $c" else e.toString
   }
-
-  def backlog = executor.getActiveThreadCount
-  def quota = executor.getParallelism
-  def waiters = executor.getQueuedTaskCount.toInt
 }

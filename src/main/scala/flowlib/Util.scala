@@ -3,6 +3,14 @@ import scala.language.higherKinds
 import scala.collection.immutable.{Queue, LinearSeq}
 import java.util.concurrent.Executor
 
+class BetterQ[T] private ( inner: Queue[T], val length: Int) {
+  def this() = this(Queue.empty, 0)
+  def enqueue(t :T) = new BetterQ(inner enqueue t, length + 1)
+  def head = inner.head
+  def tail = new BetterQ(inner.tail, length - 1)
+  def isEmpty = length == 0
+}
+
 trait NaturalMap[K[_], V[_]] { parent =>
 
   protected val underlying: Map[K[_], V[_]]

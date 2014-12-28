@@ -44,7 +44,9 @@ object Gate {
       state.transact { assign(ot) } { _ => k }
   }
 
-  def latch[T] = new Gate[T, T] {
+  trait Latch[T] extends Gate[T, T]
+
+  def latch[T] = new Latch[T] {
     private val state = Transactor(None: Option[T])
 
     def take( k: T => Unit): Unit =
@@ -58,14 +60,6 @@ object Gate {
   }
 
   trait Channel[T] extends Gate[T, T] with Monitored 
-
-  class BetterQ[T] private ( inner: Queue[T], val length: Int) {
-    def this() = this(Queue.empty, 0)
-    def enqueue(t :T) = new BetterQ(inner enqueue t, length + 1)
-    def head = inner.head
-    def tail = new BetterQ(inner.tail, length - 1)
-    def isEmpty = length == 0
-  }
 
   def channel[T](quota0: Int) = new Channel[T] {
     private val state = Transactor(new BetterQ[T])

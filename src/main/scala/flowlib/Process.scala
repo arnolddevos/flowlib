@@ -21,6 +21,8 @@ object Process {
   case class Asynchronous[U]( step: () => Process[U] ) extends Process[U]
   case class WaitingAsync[U]( respond: (U => Unit) => Unit) extends Process[U]
   case class Parallel[U]( p0: Process[Any], p1: Process[U]) extends Process[U]
+  case class Alternative[U]( p0: Process[U], p1: Process[U]) extends Process[U]
+
   // metadata for the process
   case class Decorated[U](decor: Decoration, step: Process[U]) extends Process[U]
 
@@ -43,8 +45,8 @@ object Process {
     def >>=[V]( step: U => Process[V]): Process[V] = Sequential(p0, step)
     def >>[V]( step: => Process[V]): Process[V] = Sequential(p0, (_:U) => step)
     def &[V](p1: Process[V]): Process[V] = Parallel(p0, p1)
+    def |[V >: U](p1: Process[V]): Process[V] = Alternative(p0, p1)
     def !:[D](d: D)(implicit e: IsDecor[D]): Process[U] = Decorated(e prove d, p0)
-    def run() = (new DefaultSite) run p0
     override def toString = s"Process(${extractName(this)})"
   }
 
@@ -52,6 +54,7 @@ object Process {
     case Decorated(Decoration.Name(name), _) => name
     case Decorated(_, p1) => extractName(p1)
     case Parallel(p0, p1) => extractName(p0) + " & " + extractName(p1)
+    case Alternative(p0, p1) => extractName(p0) + " | " + extractName(p1)
     case Sequential(p1, _) => extractName(p1) + " >>= ..."
     case _ => "..."
   }
