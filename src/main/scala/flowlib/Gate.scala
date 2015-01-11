@@ -34,6 +34,18 @@ object Gate {
       state.transact { case v0 => v0 + 1 } { _ => k }
   }
 
+  def counter(v0: Long) = new Gate[Long, Long] {
+    private val state = Transactor(v0)
+
+    // test positive
+    def take( k: Long => Unit): Unit =
+      state.transact { case v if v > 0 => v } { k }
+
+    // increment or decrement
+    def offer(i: Long)(k: => Unit): Unit =
+      state.transact { case v => v + i } { _ => k }
+  }
+
   def observable[T](initial: Option[T]=None) = new Gate[Option[T], T] {
     private val state = Transactor(initial)
 
