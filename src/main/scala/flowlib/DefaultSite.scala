@@ -8,7 +8,7 @@ import Gate.Latch
 class DefaultSite extends Site with Monitored {
   import Process._
 
-  val executor = new ForkJoinPool
+  val executor = DefaultSite.executor
   def started[U](p0: Process[U]): Unit = ()
   def success[U](p0: Process[U], u: U): Unit =
     println(s"Completed $p0 with: $u")
@@ -24,4 +24,9 @@ class DefaultSite extends Site with Monitored {
   def backlog = executor.getActiveThreadCount
   def quota = executor.getParallelism
   def waiters = executor.getQueuedTaskCount.toInt
+}
+
+object DefaultSite {
+  def apply() =new DefaultSite
+  val executor = new ForkJoinPool
 }
