@@ -27,7 +27,7 @@ trait Wiring {
   }
 
   implicit class FlowProcesses[A](ps: List[Process[A]]) {
-    def !:[D:IsDecor](d: D): List[Process[A]] = ps map (d !: _)
+    def !:(name: String): List[Process[A]] = ps map (name !: _)
   } 
 
   def parallel[A](ps: List[Process[A]]) = ps reduce ( _ & _ )

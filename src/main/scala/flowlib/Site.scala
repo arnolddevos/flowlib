@@ -7,41 +7,38 @@ import Gate.Latch
 
 trait Site {
   import Process._
-  import Decoration._
 
   // hooks
   def started[U](p0: Process[U]): Unit
   def success[U](p0: Process[U], u: U): Unit
-  def failure[U](p0: Process[U], w: Decoration, e: Throwable): Unit
+  def failure[U](p0: Process[U], e: Throwable, r: Recovery): Unit
 
   // async steps are run on this
   def executor: Executor
 
-  // nondeterminism resolved by this
-  def latch[U]: Latch[U]
-
-  private def resume[V,U](p0: Process[V], p: Process[U], w: Decoration)(k: U => Unit): Unit = {
+  private def resume[V,U](p0: Process[V], p: Process[U], r: Recovery)(k: U => Unit): Unit = {
 
     def async[X](x: X)(k: X => Unit): Unit = {
       executor execute new Runnable {
         def run: Unit = {
           try { k(x) }
-          catch { case NonFatal(e) => failure(p0, w, e) }
+          catch { case NonFatal(e) => failure(p0, e, r) }
         }
       }
     }
 
     def alternatives(p1: Process[U], p2: Process[U]): Unit = {
-      val l = latch[U]
-      resume(p0, p1, w) { u => l signal u }
-      resume(p0, p2, w) { u => l signal u }
+      val l = Gate.latch[U]
+      val s: U => Unit = u => l signal u
+      resume(p0, p1, r)(s)
+      resume(p0, p2, r)(s)
       l take k
     }
 
     def push(p: Process[U]): Unit = bounce(p)
 
     @tailrec
-    def bounce(p: Process[U]): Unit = {
+    def bounce(p: Process[U]): Unit = if(alive) {
       p match {
 
         // most popular cases it is supposed
@@ -57,7 +54,7 @@ trait Site {
             case Sequential(p2, step2) 
               => bounce(Sequential(p2, (x: Any) => Sequential(step2(x), step)))
             case _     
-              => resume(p0, p1, w)(t => push(step(t)))
+              => resume(p0, p1, r)(t => push(step(t)))
           }
 
         // the remaining cases
@@ -66,39 +63,42 @@ trait Site {
         case Asynchronous(step)        => async(())(_ => push(step()))
         case Parallel(p1, p2)          => run(p1); bounce(p2)
         case Alternative(p1, p2)       => alternatives(p1, p2)
-        case Decorated(w @(Will(_)|Immortal|Mortal), p1)
-                                       => resume(p0, p1, w)(k)
-        case Decorated(_, p1)          => bounce(p1)
-        case Failed(e)                 => failure(p0, w, e)
+        case Recoverable(p1, recovery) => resume(p0, p1, recovery)(k)
+        case Named(p1, _)              => bounce(p1)
+        case Failed(e)                 => failure(p0, e, r)
       }
     }
 
     bounce(p)
   }
 
+  @volatile private var alive = true
+
+  private def killer: Recovery = {
+    (p0, e) =>
+      alive = false
+      stop(())
+  }
+
   final def run(p: Process[Any]): Unit = p match {
     case Parallel(p1, p2) => run(p1); run(p2)
     case _ => 
       started(p)
-      resume(p, p, mortal)(success(p, _))
+      resume(p, p, killer)(success(p, _))
   }
 }
 
 object EventMachine extends Site {
-  import Decoration._
   import Executors._
+  import Process._
 
   val executor = trampoline(fifo)
-  def latch[U] = Gate.latch[U]
   def started[U](p0: Process[U]): Unit = ()
   def success[U](p0: Process[U], u: U): Unit =
     println(s"Completed $p0 with: $u")
-  def failure[U](p0: Process[U], w: Decoration, e: Throwable): Unit = {
+  def failure[U](p0: Process[U], e: Throwable, r: Recovery): Unit = {
     println(s"Failed $p0 with: ${formatException(e)}")
-    w match {
-      case Immortal => run(p0)
-      case _ => 
-    }
+    run("Recovery of $p0" !: continue(r(p0, e)))
   }
   def formatException(e: Throwable) = {
     val c = e.getCause

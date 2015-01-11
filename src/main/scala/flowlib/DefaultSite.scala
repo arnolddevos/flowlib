@@ -6,19 +6,15 @@ import java.util.concurrent.{ExecutorService, Executor, ForkJoinPool}
 import Gate.Latch
 
 class DefaultSite extends Site with Monitored {
-  import Decoration._
+  import Process._
 
   val executor = new ForkJoinPool
-  def latch[U] = Gate.latch[U]
   def started[U](p0: Process[U]): Unit = ()
   def success[U](p0: Process[U], u: U): Unit =
     println(s"Completed $p0 with: $u")
-  def failure[U](p0: Process[U], w: Decoration, e: Throwable): Unit = {
+  def failure[U](p0: Process[U], e: Throwable, r: Recovery): Unit = {
     println(s"Failed $p0 with: ${formatException(e)}")
-    w match {
-      case Immortal => run(p0)
-      case _ => executor.shutdown
-    }
+    run("Recovery of $p0" !: continue(r(p0, e)))
   }
   def formatException(e: Throwable) = {
     val c = e.getCause

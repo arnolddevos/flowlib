@@ -4,6 +4,9 @@ sealed trait Process[+U] extends Process.ProcessOps[U]
 
 object Process {
 
+  // how to recover from an error
+  type Recovery = (Process[Any], Throwable) => Process[Any]
+
   // a constant process
   case class Complete[U](u: U) extends Process[U]
 
@@ -16,6 +19,9 @@ object Process {
   // failed state triggers error handling
   case class Failed(e: Throwable) extends Process[Nothing]
 
+  // defined error handling
+  case class Recoverable[U]( p0: Process[U], recovery: Recovery) extends Process[U]
+
   // states for concurrent processes
   case class Waiting[U]( respond: (U => Unit) => Unit) extends Process[U]
   case class Asynchronous[U]( step: () => Process[U] ) extends Process[U]
@@ -23,8 +29,8 @@ object Process {
   case class Parallel[U]( p0: Process[Any], p1: Process[U]) extends Process[U]
   case class Alternative[U]( p0: Process[U], p1: Process[U]) extends Process[U]
 
-  // metadata for the process
-  case class Decorated[U](decor: Decoration, step: Process[U]) extends Process[U]
+  // human readable name for the process
+  case class Named[U]( p0: Process[U], name: String) extends Process[U]
 
   def process[U]( step: => Process[U]): Process[U] = Asynchronous(() => step)
 
@@ -43,16 +49,17 @@ object Process {
     def map[V]( f: U => V ): Process[V] = flatMap(u => Complete(f(u)))
     def flatMap[V]( step: U => Process[V]): Process[V] = Sequential(p0, step)
     def >>=[V]( step: U => Process[V]): Process[V] = Sequential(p0, step)
+    def *[V]( step: U => Process[V]): Process[V] = Sequential(p0, step)
     def >>[V]( step: => Process[V]): Process[V] = Sequential(p0, (_:U) => step)
     def &[V](p1: Process[V]): Process[V] = Parallel(p0, p1)
     def |[V >: U](p1: Process[V]): Process[V] = Alternative(p0, p1)
-    def !:[D](d: D)(implicit e: IsDecor[D]): Process[U] = Decorated(e prove d, p0)
+    def !:(name: String): Process[U] = Named(p0, name)
+    def recoverWith(recovery: Recovery): Process[U] = Recoverable(p0, recovery)
     override def toString = s"Process(${extractName(this)})"
   }
 
   private def extractName(p: Process[Any]): String = p match {
-    case Decorated(Decoration.Name(name), _) => name
-    case Decorated(_, p1) => extractName(p1)
+    case Named(_, name) => name
     case Parallel(p0, p1) => extractName(p0) + " & " + extractName(p1)
     case Alternative(p0, p1) => extractName(p0) + " | " + extractName(p1)
     case Sequential(p1, _) => extractName(p1) + " >>= ..."
