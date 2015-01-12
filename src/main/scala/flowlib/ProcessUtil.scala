@@ -32,7 +32,7 @@ object ProcessUtil {
   def sendTo[A](g: Gate[A, Any])(a: A): Process[Unit] = 
     waitDone(g offer a)
 
-  def takeFrom[A](g: Gate[Any, A]): Process[A] =
+  def takeFrom[A](g: Gate[Nothing, A]): Process[A] =
     waitFor(g.take) 
 
   def fanout[T]( sinks: List[T => Process[Unit]]): T => Process[Unit] =
