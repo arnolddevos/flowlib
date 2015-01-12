@@ -14,7 +14,7 @@ class DefaultSite extends Site with Monitored {
     println(s"Completed $p0 with: $u")
   def failure[U](p0: Process[U], e: Throwable, r: Recovery): Unit = {
     println(s"Failed $p0 with: ${formatException(e)}")
-    run("Recovery of $p0" !: continue(r(p0, e)))
+    run(s"Recovery of $p0" !: continue(r(p0, e)))
   }
   def formatException(e: Throwable) = {
     val c = e.getCause
