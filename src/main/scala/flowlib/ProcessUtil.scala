@@ -26,18 +26,18 @@ object ProcessUtil {
   def forever(p: Process[Any]): Process[Nothing] =
     p >> forever(p)
 
-  def cat[A]: Process[A] => (A => Process[Unit]) => Process[Nothing] =
+  def cat[A]: Source[A] => Sink[A] => Process[Nothing] =
     source => sink => forever(source >>= sink) 
 
-  def valve[A]: Process[Any] => Process[A] => (A => Process[Unit]) => Process[Nothing] =
+  def valve[A]: Source[Any] => Source[A] => Sink[A] => Process[Nothing] =
     control => source => sink => forever(control >> (source >>= sink))
 
-  def sendTo[A](g: Gate[A, Any])(a: A): Process[Unit] = 
-    waitDone(g offer a)
+  def sendTo[A](g: Gate[A, Any]): Sink[A] = 
+    a => waitDone(g offer a)
 
-  def takeFrom[A](g: Gate[Nothing, A]): Process[A] =
+  def takeFrom[A](g: Gate[Nothing, A]): Source[A] =
     waitFor(g.take) 
 
-  def fanout[T]( sinks: List[T => Process[Unit]]): T => Process[Unit] =
+  def fanout[T]( sinks: List[Sink[T]]): Sink[T] =
     t => sequence(sinks).iterate(sink => sink(t))
 }
