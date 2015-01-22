@@ -8,11 +8,8 @@ object Wiring extends Wiring
  * See also Graphs and Builder for a more complex alternative.
  */
 trait Wiring {
-  import Process.{waitFor, waitDone, stop}, ProcessUtil.fanout
+  import Process.{waitFor, waitDone, stop}, ProcessUtil.{fanout, Source, Sink}
   import Gate.Channel
-
-  type Source[+T]       = Process[T]
-  type Sink[-T]         = T => Process[Unit]
 
   implicit class FlowNode[G2, S](fn: G2 => S) {
     def ->:[G1, G <: G2](g: G1)(implicit ev: FlowIn[G1, G]): S = fn(ev.gate(g))

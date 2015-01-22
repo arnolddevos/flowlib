@@ -1,6 +1,6 @@
 package flowlib
 
-import Wiring.{Source, Sink}
+import ProcessUtil.{Source, Sink}
 
 trait Folder[+T] { parent =>
 

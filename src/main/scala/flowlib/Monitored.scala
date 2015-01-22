@@ -8,9 +8,8 @@ trait Monitored {
 
 object Monitored {
   import Process.{continue, stop}
-  import ProcessUtil.forever
+  import ProcessUtil.{forever, Sink}
   import Timing.repeatAfter
-  import Wiring.Sink
   import Folder.sequence
 
   case class Snapshot( label: String, stamp: Long, waiters: Int, backlog: Int, quota: Int) // ? extends Monitored

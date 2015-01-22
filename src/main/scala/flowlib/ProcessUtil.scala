@@ -4,6 +4,9 @@ object ProcessUtil {
   import Process._
   import Folder._
 
+  type Source[+T]       = Process[T]
+  type Sink[-T]         = T => Process[Unit]
+
   def background[U](p0: Process[U]): Process[Process[U]] = {
     val g = Gate.observable[U]()
     (p0 >>= { u => g signal Some(u); stop(u) }) & stop(Waiting(g.take))
