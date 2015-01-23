@@ -30,7 +30,7 @@ trait Folder[+T] { parent =>
 
 object Folder {
   import Process._
-
+  
   def constant[T](t: T) = new Folder[T] {
     def apply[S](s0: S)(f: (S, T) => Process[S]): Process[S] = f(s0, t)
   }

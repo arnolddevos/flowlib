@@ -2,7 +2,7 @@ package flowlib
 
 object ProcessUtil {
   import Process._
-  import Folder._
+  import Folder.sequence
 
   type Source[+T]       = Process[T]
   type Sink[-T]         = T => Process[Unit]

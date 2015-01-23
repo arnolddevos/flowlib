@@ -6,7 +6,7 @@ trait Transducers {
   /**
    * Context is some functor such as Try, Process or, just a no-op, Id.
    */
-  type Context[S]
+  type Context[+S]
   def inContext[S](s: S): Context[S]
   def mapContext[S, T](c: Context[S])( f: S => T ): Context[T]
 
@@ -44,18 +44,47 @@ trait Transducers {
   }
 
   /**
-   * Reducible is a type class with instances for 
-   * anything that can be fed into a reduction.
+   * Represents one step in an eduction. See Educer.
    */
-  trait Reducible[R[_]] {
-    def apply[A, S](ra: R[A])(f: Reducer[A, S]): Context[S]
+  type Educed[+A, +S] = Context[Option[(A, S)]]
+
+  /**
+   * Educer takes an R[A] and educes (or extracts) A's.
+   *
+   * Educer is the dual of Reducer. It is an idea that may or may not 
+   * correspond something in clojure.
+   *
+   * The step method educes a single value of A and a new R[A] in context.
+   * A result of None indicates the eduction is complete.
+   */
+  trait Educer[R[_]] {
+    def step[A](ra: R[A]): Educed[A, R[A]]
   }
 
   /**
-   * Apply a Reducer of A's to a Reducible of A's obtaining the result, of type S.
+   * Educe values from a list.
    */
-  def reduce[A, R[_], S](ra: R[A])(f: Reducer[A, S])(
-      implicit ev: Reducible[R]): Context[S] = ev(ra)(f)
+  implicit val listEducer = new Educer[List] {
+    def step[A]( as: List[A]) = inContext(as.headOption map ((_, as.tail)))
+  }
+
+
+  /**
+   * Educe a value from an option.
+   */
+  implicit val optionEducer = new Educer[Option] {
+    def step[A]( ao: Option[A]) = inContext(ao map ((_, None)))
+  }
+  
+
+  trait Educible[R[_]] {
+    def educe[A, S](r: R[A], f: Reducer[A, S]): Context[S]
+  }
+
+  implicit def isEducible[R[_]:Educer]: Educible[R]
+
+  def educe[R[_], A, S](r: R[A], f: Reducer[A, S])(implicit e: Educible[R]): Context[S] =
+    e.educe(r, f)
 
   /**
    * Transducer is a (polymorphic) function from Reducer to Reducer.
@@ -72,15 +101,22 @@ trait Transducers {
   }
 
   /**
-   * Apply a Reducer of B's to a Reducible of A's using a transducer from A's to B's
+   * Apply a Reducer of B's to an Educible of A's using a transducer from A's to B's
    */
-  def transduce[A, B, R[_]:Reducible, S](ra: R[A])(tx: Transducer[B, A], rb: Reducer[B, S]): Context[S] = 
-    reduce(ra)(tx(rb))
+  def transduce[R[_]:Educible, A, B, S](r: R[A], t: Transducer[B, A], f: Reducer[B, S]): Context[S] = 
+    educe(r, t(f))
+
+  /**
+   *  A transducer that effects no change.
+   */
+  def cat[A] = new Transducer[A, A] {
+    def apply[S](fa: Reducer[A, S]) = fa
+  }
 
   /**
    * This helper performs the basic transformation for a stateless transducer.
    */
-  def wrapStateless[A, B, S](f: Reducer[A, S])(g: (f.State, B) => Context[f.State]) = 
+  def proxy[A, B, S](f: Reducer[A, S])(g: (f.State, B) => Context[f.State]) = 
     new Reducer[B, S] {
       type State = f.State
       def init = f.init
@@ -89,11 +125,12 @@ trait Transducers {
       def complete(s: State) = f.complete(s)
     }
 
+
   /**
    * Fundamental transducer for map.
    */
   def mapper[A, B](f: B => A) = new Transducer[A, B] {
-    def apply[S](r: Reducer[A, S]) = wrapStateless(r) {
+    def apply[S](r: Reducer[A, S]) = proxy(r) {
       (s, b) => r(s, f(b))
     }
   }
@@ -102,7 +139,7 @@ trait Transducers {
    * Fundamental transducer for filter.
    */
   def filter[A](p: A => Boolean) = new Transducer[A, A] {
-    def apply[S](r: Reducer[A, S]) = wrapStateless(r) {
+    def apply[S](r: Reducer[A, S]) = proxy(r) {
       (s, a) => if(p(a)) r(s, a) else inContext(s)
     }
   }
@@ -110,9 +147,17 @@ trait Transducers {
   /**
    * Fundamental transducer for flatMap.
    */
-  def flatMapper[A, B, R[_]: Reducible](f: B => R[A]) = new Transducer[A, B] {
-    def apply[S](r: Reducer[A, S]) = wrapStateless(r) {
-      (s, b) =>reduce(f(b))(reducer(s)(r(_, _)))
+  def flatMapper[A, B, R[_]:Educible](g: B => R[A]) = new Transducer[A, B] {
+    def apply[S](f: Reducer[A, S]) = proxy(f) {
+      (s, b) =>
+        val inner = new Reducer[A, f.State] {
+          type State = f.State
+          def init = s
+          def apply(s: State, a: A) = f.apply(s, a)
+          def isReduced(s: State) = f.isReduced(s)
+          def complete(s: State) = s
+        }
+        educe(g(b), inner)
     }
   }
 
@@ -148,6 +193,27 @@ trait Transducers {
       def complete(s: State): S = r.complete(s._1)
     }
   }
+
+  trait View[A] {
+    type Elem
+    type Base[_]
+    def base: Base[Elem]
+    def isEducible: Educible[Base]
+    def trans: Transducer[A, Elem]
+  }
+
+  implicit def viewIsEducible = new Educible[View] {
+    def educe[A, S](v: View[A], f: Reducer[A, S]): Context[S] =
+      transduce(v.base, v.trans, f)(v.isEducible)
+  }
+
+  def view[R[_], A, B](rb: R[B], tx: Transducer[A, B])(implicit e: Educible[R]) = new View[A] {
+    type Elem = B
+    type Base[X] = R[X]
+    val base = rb
+    def isEducible = e
+    def trans = tx
+  }
 }
 
 /**
@@ -155,32 +221,25 @@ trait Transducers {
  *  and a reduction step returns the new state directly as a value.
  */
 object Transducers extends Transducers {
-  type Context[S] = S
+  type Context[+S] = S
   def inContext[S](s: S) = s
   def mapContext[S, T](s: S)( f: S => T ) = f(s)
 
-  implicit val listIsReducible = new Reducible[List] {
-    def apply[A, S]( as0: List[A])( f: Reducer[A, S]): S = {
-
+  def isEducible[R[_]](implicit e: Educer[R]) = new Educible[R] {
+    def educe[A, S](ra: R[A], f: Reducer[A, S]): S = {
       @annotation.tailrec
-      def loop(s: f.State, as: List[A]): S = {
-        if(f.isReduced(s)) 
-          f.complete(s)
-        else 
-          as match {
-            case a :: as1 => loop(f(s, a), as1)
-            case Nil => f.complete(s)
+      def loop(ra: R[A], sf: f.State ): S = {
+        if(f.isReduced(sf)) 
+          f.complete(sf)
+        else
+          e.step(ra) match {
+            case Some((a, ra1)) => loop(ra1, f(sf, a))
+            case None => f.complete(sf)
           }
       }
-
-      loop(f.init, as0)
+      loop(ra, f.init)
     }
   }
-
-  implicit val optionIsReducible = new Reducible[Option] {
-    def apply[A, S]( oa: Option[A])(f : Reducer[A, S]): S = 
-      f.complete(oa.fold(f.init)(f(f.init, _)))
-  }  
 }
 
 /**
@@ -191,53 +250,29 @@ object Transducers extends Transducers {
 object TransducersWithTry extends Transducers {
   import scala.util.{Try, Success, Failure}
 
-  type Context[S] = Try[S]
+  type Context[+S] = Try[S]
   def inContext[S](s: S): Try[S] = Success(s)
   def mapContext[S, T](c: Try[S])( f: S => T ) = c map f
 
-  implicit val listIsReducible = new Reducible[List] {
-    def apply[A, S]( as0: List[A])( f: Reducer[A, S]): Try[S] = {
-
+  def isEducible[R[_]](implicit e: Educer[R]) = new Educible[R] {
+    def educe[A, S](ra: R[A], f: Reducer[A, S]): Try[S] = {
       @annotation.tailrec
-      def loop(s: f.State, as: List[A]): Try[S] = {
-        if(f.isReduced(s))
-          Success(f.complete(s))
-        else
-          as match {
-            case a :: as1 => 
-              f(s, a) match {
-                case Success(s1) => loop(s1, as1)
+      def loop(ra: R[A], sf: f.State ): Try[S] = {
+        if(f.isReduced(sf)) 
+          Success(f.complete(sf))
+        else { 
+          e.step(ra) match {
+            case Success(Some((a, ra1))) => 
+              f(sf, a) match {
+                case Success(sf1) => loop(ra1, sf1)
                 case Failure(t) => Failure[S](t)
               }
-            case Nil => Success(f.complete(s))
+            case Success(None) => Success(f.complete(sf))
+            case Failure(t) => Failure[S](t)
           }
+        }
       }
-
-      loop(f.init, as0)
-    }
-  }
-
-  implicit val optionIsReducible = new Reducible[Option] {
-    def apply[A, S]( oa: Option[A])(f : Reducer[A, S]): Try[S] = 
-      oa.fold(inContext(f.init))(a => f(f.init, a)) map (f.complete(_))
-  }
-}
-
-/**
- *  In this realisation of Transducers, 
- *  reductions are (asynchronous) processes which 
- *  can be subsequently run, or composed with other processes.
- */
-object ProcessTransducers extends Transducers {
-  import Process._
-
-  type Context[S] = flowlib.Process[S]
-  def inContext[S](s: S) = stop(s)
-  def mapContext[S, T](p: Process[S])( f: S => T ) = p map f
-
-  implicit def folderIsReducible = new Reducible[Folder] {
-    def apply[A, S]( f: Folder[A])( r: Reducer[A, S]): Process[S] = {
-      f(r.init)(r(_, _)) map (r.complete(_))
+      loop(ra, f.init)
     }
   }
 }
