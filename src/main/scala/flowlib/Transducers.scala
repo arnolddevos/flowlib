@@ -207,12 +207,19 @@ trait Transducers {
       transduce(v.base, v.trans, f)(v.isEducible)
   }
 
-  def view[R[_], A, B](rb: R[B], tx: Transducer[A, B])(implicit e: Educible[R]) = new View[A] {
+  def view[R[_], A, B](rb: R[B], t: Transducer[A, B])(implicit e: Educible[R]): View[A] = new View[A] {
     type Elem = B
     type Base[X] = R[X]
     val base = rb
     def isEducible = e
-    def trans = tx
+    def trans = t
+  }
+
+  implicit class EductionOps[R[_]:Educible, A]( ra: R[A] ) {
+    def map[B](g: A => B) = view(ra, mapper(g))
+    def flatMap[S[_]:Educible, B](g: A => S[B]) = view(ra, flatMapper(g))
+    def >>=[S[_]:Educible, B](g: A => S[B]) = flatMap(g)
+    def withFilter(p: A => Boolean) = view(ra, filter(p))
   }
 }
 
