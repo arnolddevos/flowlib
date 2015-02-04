@@ -219,6 +219,7 @@ trait Transducers {
     def map[B](g: A => B) = view(ra, mapper(g))
     def flatMap[S[_]:Educible, B](g: A => S[B]) = view(ra, flatMapper(g))
     def >>=[S[_]:Educible, B](g: A => S[B]) = flatMap(g)
+    def >>[S[_]:Educible, B]( k: => S[B] ) = flatMap(_ => k)
     def withFilter(p: A => Boolean) = view(ra, filter(p))
   }
 }

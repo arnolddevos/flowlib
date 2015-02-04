@@ -33,9 +33,15 @@ object Producer extends Transducers {
     }
   }
 
-  type Produced[T] = Process[Option[(T, Producer[T])]] // same as Educed[T, Producer[T]]
+  type Produced[+A] = Process[Option[(A, Producer[A])]] // same as Educed[A, Producer[A]]
 
-  def producer[T](p: Produced[T]) = new Producer[T] { def step = p }
+  def producer[A](p: Produced[A]) = new Producer[A] { def step = p }
+
+  def emit[A](value: A)(resume: Producer[A]): Produced[A] = stop(Some((value, resume)))
+
+  val emitEnd: Produced[Nothing] = stop(None)
+
+  val emptyProducer: Producer[Nothing] = producer(emitEnd)
 
   implicit def producerEducer = new Educer[Producer] {
     def step[A]( p: Producer[A]) = p.step
