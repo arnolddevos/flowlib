@@ -3,8 +3,8 @@ import scala.language.higherKinds
 
 import Producer._
 
-trait Producer[+T] {
-  def step: Produced[T]
+trait Producer[+A] {
+  def step: Produced[A]
 }
 
 object Producer extends Transducers {
