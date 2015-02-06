@@ -8,9 +8,8 @@ trait Monitored {
 
 object Monitored {
   import Process.{continue, stop}
-  import ProcessUtil.{forever, Sink}
+  import ProcessUtil.{forever, foreach, Sink}
   import Timing.repeatAfter
-  import Folder.sequence
 
   case class Snapshot( label: String, stamp: Long, waiters: Int, backlog: Int, quota: Int) // ? extends Monitored
 
@@ -24,7 +23,7 @@ object Monitored {
               for((l, m) <- lms)
               yield Snapshot(l, System.currentTimeMillis, m.waiters, m.backlog, m.quota)
 
-            sequence(ss) iterate output
+            foreach(ss)(output)
           }
         }
       }

@@ -2,7 +2,6 @@ package flowlib
 
 object ProcessUtil {
   import Process._
-  import Folder.sequence
 
   type Source[+T]       = Process[T]
   type Sink[-T]         = T => Process[Unit]
@@ -26,6 +25,14 @@ object ProcessUtil {
   def forever(p: Process[Any]): Process[Nothing] =
     p >> forever(p)
 
+  def foreach[A](la: List[A])( p: A => Process[Any] ): Process[Unit] = {
+    def loop(la: List[A]): Process[Unit] = la match {
+      case a :: la1 => p(a) >> loop(la1)
+      case Nil => stop(())
+    }
+    loop(la)
+  }
+
   def cat[A]: Source[A] => Sink[A] => Process[Nothing] =
     source => sink => forever(source >>= sink) 
 
@@ -39,5 +46,5 @@ object ProcessUtil {
     waitFor(g.take) 
 
   def fanout[T]( sinks: List[Sink[T]]): Sink[T] =
-    t => sequence(sinks).iterate(sink => sink(t))
+    t => foreach(sinks){ sink => sink(t) }
 }
