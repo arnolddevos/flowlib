@@ -2,6 +2,7 @@ package flowlib
 import scala.language.higherKinds
  
 import Process._
+import ProcessUtil._
 import Producer._
 
 trait Producer[+A] { parent =>
@@ -45,4 +46,39 @@ object Producer extends Transducers {
   def producer[A](p: Produced[A]) = new Producer[A] { def step = p }
 
   val emptyProducer: Producer[Nothing] = producer(nothingProduced)
+
+  def stream[R[_]: Educible, A](ra: R[A]): Sink[Option[A]] => Process[Unit] = {
+    output =>
+      val f = reducer(())((_, a: A) => output(Some(a)))
+      educe(ra, f) >> output(None)
+  }
+
+  def emit[R[_]: Educible, A](ra: R[A]): Sink[A] => Process[Unit] = {
+    output =>
+      val f = reducer(())((_, a: A) => output(a))
+      educe(ra, f)
+  }
+
+  def unstream[A, S]( f: Reducer[A, S]): Source[Option[A]] => Process[S] = {
+    input =>
+      def loop(s: f.State): Process[S] = {
+        if(f.isReduced(s)) stop(f.complete(s))
+        else
+          input >>= {
+            case Some(a) => f(s, a) >>= loop
+            case None => stop(f.complete(s))
+          }
+      }
+      loop(f.init)
+  }
+
+  def absorb[A, S]( f: Reducer[A, S]): Source[A] => Process[S] = {
+    input =>
+      def loop(s: f.State): Process[S] = {
+        if(f.isReduced(s)) stop(f.complete(s))
+        else 
+          input >>= (f(s, _)) >>= loop
+      }
+      loop(f.init)
+  }
 }

@@ -35,7 +35,7 @@ trait Transducers {
    * Make a basic reducer fom an initial value and function. 
    * (State and result S will be the same type.)
    */
-  def reducer[A, S](s: S)(f: (S, A) => Context[S]) = new Reducer[A, S] {
+  def reducer[A, S](s: S)(f: (S, A) => Context[S]): Reducer[A, S] = new Reducer[A, S] {
     type State = S
     def init: S = s
     def apply(s: S, a: A): Context[S] = f(s, a)

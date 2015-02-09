@@ -47,4 +47,10 @@ object ProcessUtil {
 
   def fanout[T]( sinks: List[Sink[T]]): Sink[T] =
     t => foreach(sinks){ sink => sink(t) }
+
+  implicit class ProcessesOp[A](ps: List[Process[A]]) {
+    def !:(name: String): List[Process[A]] = ps map (name !: _)
+  } 
+
+  def parallel[A](ps: List[Process[A]]) = ps reduce ( _ & _ )
 }

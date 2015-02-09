@@ -23,12 +23,6 @@ trait Wiring {
       fns map(fn => fn(ev.gate(g)))
   }
 
-  implicit class FlowProcesses[A](ps: List[Process[A]]) {
-    def !:(name: String): List[Process[A]] = ps map (name !: _)
-  } 
-
-  def parallel[A](ps: List[Process[A]]) = ps reduce ( _ & _ )
-
   def tee[G1, G2, A](g1: G1, g2: G2)(implicit e1: FlowOut[G1, Sink[A]], e2: FlowOut[G2, Sink[A]]) = 
     fanout(List(e1.gate(g1), e2.gate(g2)))
 
