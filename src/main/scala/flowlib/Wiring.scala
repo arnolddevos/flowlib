@@ -1,6 +1,6 @@
 package flowlib
 
-
+@deprecated("use Flow instead", "recently")
 object Wiring extends Wiring
 
 /**

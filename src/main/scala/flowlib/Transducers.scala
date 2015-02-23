@@ -215,6 +215,8 @@ trait Transducers {
     def trans = t
   }
 
+  def view[R[_], B](rb: R[B])(implicit e: Educible[R]): View[B] = view[R, B, B](rb, cat[B])
+
   implicit class EductionOps[R[_]:Educible, A]( ra: R[A] ) {
     def map[B](g: A => B) = view(ra, mapper(g))
     def flatMap[S[_]:Educible, B](g: A => S[B]) = view(ra, flatMapper(g))

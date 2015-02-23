@@ -2,7 +2,7 @@ package flowlib
 
 import scala.language.higherKinds
 import ProcessUtil._
-import Producer._
+import Producers._
 
 object Flow extends Flow
 
