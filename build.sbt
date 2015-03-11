@@ -2,7 +2,9 @@ name := "flowlib"
 
 organization := "au.com.langdale"
 
-version := "0.8"
+versionWithGit
+
+git.baseVersion := "0.9"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.1" % "test"
 
