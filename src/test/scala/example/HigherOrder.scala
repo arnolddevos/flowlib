@@ -1,6 +1,6 @@
 trait HigherOrder {
   import flowlib._
-  import Wiring._
+  import Flow._
   import Gate._
 
   type Input[A] = Process[A]
@@ -21,5 +21,5 @@ trait HigherOrder {
     rows ->: foldRows :-> sums
   } 
 
-  ensemble.run
+  DefaultSite() run ensemble
 }
