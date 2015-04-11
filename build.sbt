@@ -1,6 +1,6 @@
 name := "flowlib"
 
-organization := "au.com.langdale"
+organization := "com.bgsig"
 
 versionWithGit
 
