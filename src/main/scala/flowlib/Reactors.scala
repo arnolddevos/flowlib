@@ -1,7 +1,7 @@
 package flowlib
 
-import Process._
-import ProcessUtil._
+import flowlib.{Process=>P, Timing=>T}
+import Process.{waitDone, waitFor}
 
 
 /**
@@ -13,6 +13,14 @@ trait Reactors {
   def backlog: Int
   def period: Long
   def site: Site
+  
+  type Actor = Reactor[Any]
+  type Process[+U] = P[U]
+  def stop[U](u: U): Process[U] = P.stop(u)
+  def process[U](u: => Process[U]): Process[U] = P.process(u)
+  def after(ms: Long): Process[Unit] = T.after(ms)
+
+  case object PoisonPill 
 
   trait Reactor[A] {
     val mailbox = new TimedQueue[A](backlog, period)
