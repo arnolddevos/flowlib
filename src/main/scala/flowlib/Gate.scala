@@ -56,6 +56,16 @@ object Gate {
       state.transact { assign(ot) } { _ => k }
   }
 
+  def conditional[T](initial: T)(p: T => Boolean) = new Gate[T, T] {
+    private val state = Transactor(initial)
+
+    def take( k: T => Unit): Unit =
+      state.transact { case t if p(t) => t } { k }
+
+    def offer(t: T)(k: => Unit): Unit =
+      state.transact { assign(t) } { _ => k }
+  }
+
   trait Latch[T] extends Gate[T, T]
 
   def latch[T] = new Latch[T] {
