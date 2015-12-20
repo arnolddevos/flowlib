@@ -27,6 +27,12 @@ trait Reactors {
     def !!( a: A): Process[Unit]
   }
 
+  trait ChannelProxy[-A] extends Channel[A] {
+    def !(a: A) = input ! a
+    def !!(a: A) = input !! a
+    protected def input: Channel[A]
+  }
+
   trait Reactor[A] extends Channel[A] {
     private val mailbox = new TimedQueue[A](backlog, period)
     
