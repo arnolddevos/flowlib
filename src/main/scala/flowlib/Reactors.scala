@@ -22,23 +22,28 @@ trait Reactors {
 
   case object PoisonPill 
 
-  trait Reactor[A] {
-    val mailbox = new TimedQueue[A](backlog, period)
+  trait Channel[-A] {
+    def !( a: A): Unit
+    def !!( a: A): Process[Unit]
+  }
+
+  trait Reactor[A] extends Channel[A] {
+    private val mailbox = new TimedQueue[A](backlog, period)
     
-    def !( a: A): Unit = 
+    final def !( a: A): Unit = 
       mailbox signal a
     
-    def !!( a: A): Process[Unit] = 
+    final def !!( a: A): Process[Unit] = 
       waitDone(mailbox offer a)
     
-    def react( f: A => Process[Unit]) = 
+    final protected def react( f: A => Process[Unit]) = 
       waitFor(mailbox.take) >>= f
     
-    def reactWithin(ms: Long)( f: Option[A] => Process[Unit]) = 
+    final protected def reactWithin(ms: Long)( f: Option[A] => Process[Unit]) = 
       waitFor(mailbox.takeWithin(ms)) >>= f
     
-    def start = site run process(act)
+    final def start = site run process(act)
 
-    def act: Process[Unit]
+    protected def act: Process[Unit]
   }
 }
