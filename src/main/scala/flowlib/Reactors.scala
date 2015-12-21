@@ -22,18 +22,18 @@ trait Reactors {
 
   case object PoisonPill 
 
-  trait Channel[-A] {
+  trait OutputChannel[-A] {
     def !( a: A): Unit
     def !!( a: A): Process[Unit]
   }
 
-  trait ChannelProxy[-A] extends Channel[A] {
-    def !(a: A) = input ! a
-    def !!(a: A) = input !! a
-    protected def input: Channel[A]
+  trait OutputProxy[-A] extends OutputChannel[A] {
+    def !(a: A) = self ! a
+    def !!(a: A) = self !! a
+    protected def self: OutputChannel[A]
   }
 
-  trait Reactor[A] extends Channel[A] {
+  trait Reactor[A] extends OutputChannel[A] {
     private val mailbox = new TimedQueue[A](backlog, period)
     
     final def !( a: A): Unit = 
