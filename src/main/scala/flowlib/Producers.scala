@@ -1,6 +1,9 @@
 package flowlib
+
 import scala.language.higherKinds
  
+import transducers.{Transducers, Views, Operators, AsyncEducers}
+
 import Process._
 import ProcessUtil._
 
@@ -12,30 +15,12 @@ object Series {
 }
 
 
-object Producers extends Transducers {
+object Producers extends Transducers with Views with Operators with AsyncEducers {
 
   type Context[+S] = Process[S]
   def inContext[S](s: S) = stop(s)
   def mapContext[S, T](p: Process[S])( f: S => T ) = p map f
-  
-  implicit def isEducible[R[_]](implicit e: Educer[R]) = new Educible[R] {
-    def educe[A, S](ra: R[A], f: Reducer[A, S]): Process[S] = {
-      def loop(ra: R[A], sf: f.State ): Process[S] = {
-        if(f.isReduced(sf)) 
-          stop(f.complete(sf))
-        else  
-          e.step(ra) >>= {
-            case Some((a, ra1)) =>
-              f(sf, a) >>= {
-                sf1 =>
-                  loop(ra1, sf1)
-              }
-            case None => stop(f.complete(sf))
-          }
-      }
-      loop(ra, f.init)
-    }
-  }
+  def bindContext[S, T](p: Process[S])(f: S => Process[T]): Process[T] = p flatMap f
 
   def stream[R[_]: Educible, A](ra: R[A]): Sink[Option[A]] => Process[Unit] = {
     output =>
