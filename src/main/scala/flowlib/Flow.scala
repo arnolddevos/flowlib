@@ -41,11 +41,11 @@ trait Flow {
   implicit def connectSources[S, N, M](implicit c: FlowIn[S, N, M]): FlowIn[S, List[N], List[M]] =
     flowIn((s, ns) => ns map (n => c(s, n)))
 
-  implicit def connectEduction[A, R[_], S](implicit e: Educible[R], c: FlowOut[S, Sink[A] => Sink[A], Sink[A]]): FlowOut[S, R[A], Process[Unit]] = {
+  implicit def connectEduction[A, G, S](implicit e: Educible[G, A], c: FlowOut[S, Sink[A] => Sink[A], Sink[A]]): FlowOut[S, G, Process[Unit]] = {
     flowOut {
-      (s, ra) => 
+      (s, g) => 
         val o = c(s, identity)
-        val p = emit(ra)
+        val p = emit(g)
         p(o)
     }
   }

@@ -22,16 +22,16 @@ object Producers extends Transducers with Views with Operators with AsyncEducers
   def mapContext[S, T](p: Process[S])( f: S => T ) = p map f
   def bindContext[S, T](p: Process[S])(f: S => Process[T]): Process[T] = p flatMap f
 
-  def stream[R[_]: Educible, A](ra: R[A]): Sink[Option[A]] => Process[Unit] = {
+  def stream[G, A](g: G)(implicit e: Educible[G, A]): Sink[Option[A]] => Process[Unit] = {
     output =>
       val f = reducer(())((_, a: A) => output(Some(a)))
-      educe(ra, f) >> output(None)
+      educe(g, f) >> output(None)
   }
 
-  def emit[R[_]: Educible, A](ra: R[A]): Sink[A] => Process[Unit] = {
+  def emit[G, A](g: G)(implicit e: Educible[G, A]): Sink[A] => Process[Unit] = {
     output =>
       val f = reducer(())((_, a: A) => output(a))
-      educe(ra, f)
+      educe(g, f)
   }
 
   def unstream[A, S]( f: Reducer[A, S]): Source[Option[A]] => Process[S] = {
@@ -68,8 +68,8 @@ object Producers extends Transducers with Views with Operators with AsyncEducers
     def apply[A](a: A, as: Producer[A]): Producer[A] = stop(NonEmpty(a, as))
   }
 
-  implicit val producerIsEducible = new Educible[Producer] {
-    def educe[A, S](as: Producer[A], f: Reducer[A, S]): Process[S] = {
+  implicit def producerIsEducible[A] = new Educible[Producer[A], A] {
+    def educe[S](as: Producer[A], f: Reducer[A, S]): Process[S] = {
       def loop(as: Producer[A], sf: f.State ): Process[S] = {
         if(f.isReduced(sf)) 
           stop(f.complete(sf))
