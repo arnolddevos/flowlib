@@ -1,7 +1,7 @@
 package flowlib
 
 import scala.language.higherKinds
- 
+
 import transducers.{Transducers, Views, Operators, AsyncEducers}
 
 import Process._
@@ -25,13 +25,13 @@ object Producers extends Transducers with Views with Operators with AsyncEducers
   def stream[G, A](g: G)(implicit e: Educible[G, A]): Sink[Option[A]] => Process[Unit] = {
     output =>
       val f = reducer(())((_, a: A) => output(Some(a)))
-      educe(g, f) >> output(None)
+      reduce(g, f) >> output(None)
   }
 
   def emit[G, A](g: G)(implicit e: Educible[G, A]): Sink[A] => Process[Unit] = {
     output =>
       val f = reducer(())((_, a: A) => output(a))
-      educe(g, f)
+      reduce(g, f)
   }
 
   def unstream[A, S]( f: Reducer[A, S]): Source[Option[A]] => Process[S] = {
@@ -51,7 +51,7 @@ object Producers extends Transducers with Views with Operators with AsyncEducers
     input =>
       def loop(s: f.State): Process[S] = {
         if(f.isReduced(s)) stop(f.complete(s))
-        else 
+        else
           input >>= (f(s, _)) >>= loop
       }
       loop(f.init)
@@ -71,9 +71,9 @@ object Producers extends Transducers with Views with Operators with AsyncEducers
   implicit def producerIsEducible[A] = new Educible[Producer[A], A] {
     def educe[S](as: Producer[A], f: Reducer[A, S]): Process[S] = {
       def loop(as: Producer[A], sf: f.State ): Process[S] = {
-        if(f.isReduced(sf)) 
+        if(f.isReduced(sf))
           stop(f.complete(sf))
-        else  
+        else
           as >>= {
             case NonEmpty(a, as1) =>
               f(sf, a) >>= {
@@ -85,5 +85,5 @@ object Producers extends Transducers with Views with Operators with AsyncEducers
       }
       loop(as, f.init)
     }
-  }  
+  }
 }
