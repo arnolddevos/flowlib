@@ -2,7 +2,7 @@ package flowlib
 
 import scala.language.higherKinds
 
-import transducers.{Transducers, Views, Operators, AsyncEducers}
+import transducers.{Transducers, Views, Operators, AsyncEducers, ContextIsMonad}
 
 import Process._
 import ProcessUtil._
@@ -15,7 +15,7 @@ object Series {
 }
 
 
-object Producers extends Transducers with Views with Operators with AsyncEducers {
+object Producers extends Transducers with Views with Operators with AsyncEducers with ContextIsMonad {
 
   type Context[+S] = Process[S]
   def inContext[S](s: S) = stop(s)
