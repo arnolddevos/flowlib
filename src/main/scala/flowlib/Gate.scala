@@ -34,8 +34,15 @@ object Gate {
       state.transact { case v0 => v0 + 1 } { _ => k }
   }
 
-  def counter(v0: Long) = new Gate[Long, Long] {
+  trait Counter extends Gate[Long, Long] with Monitored
+
+  def counter(v0: Long) = new Counter {
     private val state = Transactor(v0)
+    import Util.clampLongtoInt
+
+    def quota = clampLongtoInt(v0)
+    def waiters = state.waiters
+    def backlog = clampLongtoInt(state.snapshot)
 
     // test positive
     def take( k: Long => Unit): Unit =
