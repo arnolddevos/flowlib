@@ -82,13 +82,13 @@ object Gate {
       state.transact { case ot @ Some(_) => ot } { _ foreach k }
 
     def offer(t: T)(k: => Unit): Unit =
-      state.transact { 
-        case ot @ Some(_) => ot 
-        case None => Some(t) 
+      state.transact {
+        case ot @ Some(_) => ot
+        case None => Some(t)
       } { _ => k }
   }
 
-  trait Channel[T] extends Gate[T, T] with Monitored 
+  trait Channel[T] extends Gate[T, T] with Monitored
 
   def channel[T](quota0: Int) = new Channel[T] {
     private val state = Transactor(new BetterQ[T])

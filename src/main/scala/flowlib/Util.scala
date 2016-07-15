@@ -49,7 +49,7 @@ object Executors {
     private var s = empty
     private var quiescent = true
 
-    def execute( r0: Runnable ): Unit = { 
+    def execute( r0: Runnable ): Unit = {
       s = enqueue(s, r0)
       if(quiescent){
         quiescent = false
@@ -57,7 +57,7 @@ object Executors {
           val (r, s1) = dequeue(s)
           s = s1
           r.run
-        }      
+        }
         quiescent = true
       }
     }
