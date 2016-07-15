@@ -33,24 +33,31 @@ object ProcessUtil {
     loop(la)
   }
 
+  def reduce[A, S](p: Sink[A] => Process[Unit])(f: (S, A) => Process[S]): Process[S] ={
+    p {
+      (a: A) => stop(())
+    }
+    ???
+  }
+
   def cat[A]: Source[A] => Sink[A] => Process[Nothing] =
-    source => sink => forever(source >>= sink) 
+    source => sink => forever(source >>= sink)
 
   def valve[A]: Source[Any] => Source[A] => Sink[A] => Process[Nothing] =
     control => source => sink => forever(control >> (source >>= sink))
 
-  def sendTo[A](g: Gate[A, Any]): Sink[A] = 
+  def sendTo[A](g: Gate[A, Any]): Sink[A] =
     a => waitDone(g offer a)
 
   def takeFrom[A](g: Gate[Nothing, A]): Source[A] =
-    waitFor(g.take) 
+    waitFor(g.take)
 
   def fanout[T]( sinks: List[Sink[T]]): Sink[T] =
     t => foreach(sinks){ sink => sink(t) }
 
   implicit class ProcessesOp[A](ps: List[Process[A]]) {
     def !:(name: String): List[Process[A]] = ps map (name !: _)
-  } 
+  }
 
   def parallel[A](ps: List[Process[A]]) = ps reduce ( _ & _ )
 }
