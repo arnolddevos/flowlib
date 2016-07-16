@@ -6,14 +6,7 @@ import transducers.{Transducers, Views, Operators, AsyncEducers, ContextIsMonad}
 
 import Process._
 import ProcessUtil._
-
-sealed trait Series[+A]
-
-object Series {
-  case class NonEmpty[+A](head: A, tail: Process[Series[A]]) extends Series[A]
-  case object Empty extends Series[Nothing]
-}
-
+import Generators._
 
 object Producers extends Transducers with Views with Operators with AsyncEducers with ContextIsMonad {
 
