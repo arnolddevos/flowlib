@@ -13,12 +13,14 @@ object Generators {
     def concat[B >: A](gb: Generator[B]): Generator[B] = Generator.concat(g, gb)
     def fold[S](z: S)(f: (S, A) => S): Process[S] = Generator.fold(g)(z)(f)
     def sink: Sink[A] => Process[Unit] = Generator.sink(g)
+    def +:[B >: A](b: B): Generator[B] = Generator(b, g)
   }
 
   object Generator {
     def apply(): Generator[Nothing] = stop(Series())
     def apply[A](a: A): Generator[A] = stop(Series(a))
-    def apply[A](as: List[A]): Generator[A] = stop(Series(as))
+    def apply[A](a: A, g: Generator[A]): Generator[A] = stop(Series(a, g))
+    def fromList[A](as: List[A]): Generator[A] = stop(Series.fromList(as))
 
     def bind[A, B](g: Generator[A])(f: A => Generator[B]): Generator[B] = {
       g >>= {
@@ -58,17 +60,20 @@ object Generators {
       case Empty => s
       case NonEmpty(a, p) => NonEmpty(a, p >>= (t => stop(t.concat(s))))
     }
+
+    def +:[B >: A](b: B): Series[B] = NonEmpty(b, stop(this))
   }
 
   object Series {
 
-    case class NonEmpty[+A](head: A, tail: Process[Series[A]]) extends Series[A]
+    case class NonEmpty[+A](head: A, tail: Generator[A]) extends Series[A]
     case object Empty extends Series[Nothing]
 
     def apply(): Series[Nothing] = Empty
     def apply[A](a: A): Series[A] = NonEmpty(a, stop(Empty))
-    def apply[A](as: List[A]): Series[A] = as match {
-      case a :: as1 => NonEmpty(a, continue(stop(apply(as1))))
+    def apply[A](a: A, g: Generator[A]): Series[A] = NonEmpty(a, g)
+    def fromList[A](as: List[A]): Series[A] = as match {
+      case a :: as1 => NonEmpty(a, continue(stop(fromList(as1))))
       case Nil => Empty
     }
   }
