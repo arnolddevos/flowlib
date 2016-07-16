@@ -33,13 +33,6 @@ object ProcessUtil {
     loop(la)
   }
 
-  def reduce[A, S](p: Sink[A] => Process[Unit])(f: (S, A) => Process[S]): Process[S] ={
-    p {
-      (a: A) => stop(())
-    }
-    ???
-  }
-
   def cat[A]: Source[A] => Sink[A] => Process[Nothing] =
     source => sink => forever(source >>= sink)
 
