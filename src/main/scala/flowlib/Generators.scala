@@ -22,6 +22,13 @@ object Generators {
     def apply[A](a: A, g: Generator[A]): Generator[A] = stop(Series(a, g))
     def fromList[A](as: List[A]): Generator[A] = stop(Series.fromList(as))
 
+    def map[A, B](g: Generator[A])(f: A => B): Generator[B] = {
+      g map {
+        case NonEmpty(a, g1) => NonEmpty(f(a), map(g1)(f))
+        case Empty => Empty
+      }
+    }
+
     def bind[A, B](g: Generator[A])(f: A => Generator[B]): Generator[B] = {
       g >>= {
         case NonEmpty(a, g1) => concat(f(a), bind(g1)(f))
@@ -57,8 +64,13 @@ object Generators {
 
   sealed trait Series[+A] {
     def concat[B >: A](s: Series[B]): Series[B] = this match {
+      case NonEmpty(a, p) => NonEmpty(a, p map (_ concat s))
       case Empty => s
-      case NonEmpty(a, p) => NonEmpty(a, p >>= (t => stop(t.concat(s))))
+    }
+
+    def map[B](f: A => B): Series[B] = this match {
+      case NonEmpty(a, p) => NonEmpty(f(a), p map (_ map f))
+      case Empty => Empty
     }
 
     def +:[B >: A](b: B): Series[B] = NonEmpty(b, stop(this))
