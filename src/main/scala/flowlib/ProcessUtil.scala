@@ -35,9 +35,20 @@ object ProcessUtil {
   def applyForever[A](f: A => Process[Any]): Source[A] => Process[Nothing] =
     input => forever(input >>= f)
 
+  def mapForever[A, B](f: A => Process[B]): Source[A] => Sink[B] => Process[Nothing] =
+    input => output => forever(input >>= f >>= output)
+
   def foldForever[S, A](z: S)(f: (S, A) => Process[S]): Source[A] => Process[Nothing] = {
     input =>
       def loop(s: S): Process[Nothing] = input >>= (f(s, _)) >>= loop
+      loop(z)
+  }
+
+  def foldMapForever[S, A, B](z: S)(f: (S, A) => Process[(S, B)]): Source[A] => Sink[B] => Process[Nothing] = {
+    input => output =>
+      def loop(s0: S): Process[Nothing] = input >>= (f(s0, _)) >>= {
+        case (s1, b) => output(b) >> loop(s1)
+      }
       loop(z)
   }
 
