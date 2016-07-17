@@ -9,11 +9,14 @@ object Generators {
 
   type Generator[+A] = Process[Series[A]]
 
-  implicit class GeneratorOps[A](g: Generator[A]) {
-    def concat[B >: A](gb: Generator[B]): Generator[B] = Generator.concat(g, gb)
-    def fold[S](z: S)(f: (S, A) => S): Process[S] = Generator.fold(g)(z)(f)
-    def sink: Sink[A] => Process[Unit] = Generator.sink(g)
-    def +:[B >: A](b: B): Generator[B] = Generator(b, g)
+  implicit class generator[A](g: Generator[A]) {
+    def concat[B >: A](gb: Generator[B]) = Generator.concat(g, gb)
+    def fold[S](z: S)(f: (S, A) => S) = Generator.fold(g)(z)(f)
+    def sink = Generator.sink(g)
+    def +:[B >: A](b: B) = Generator(b, g)
+    def map[B](f: A => B) = Generator.map(g)(f)
+    def flatMap[B](f: A => Generator[B]) = Generator.flatMap(g)(f)
+    def filter(f: A => Boolean) = Generator.filter(g)(f)
   }
 
   object Generator {
@@ -24,29 +27,48 @@ object Generators {
 
     def map[A, B](g: Generator[A])(f: A => B): Generator[B] = {
       g map {
-        case NonEmpty(a, g1) => NonEmpty(f(a), map(g1)(f))
-        case Empty => Empty
+        _ match {
+          case NonEmpty(a, g1) => NonEmpty(f(a), map(g1)(f))
+          case Empty => Empty
+        }
       }
     }
 
-    def bind[A, B](g: Generator[A])(f: A => Generator[B]): Generator[B] = {
+    def flatMap[A, B](g: Generator[A])(f: A => Generator[B]): Generator[B] = {
       g >>= {
-        case NonEmpty(a, g1) => concat(f(a), bind(g1)(f))
-        case Empty => stop(Empty)
+        _ match {
+          case NonEmpty(a, g1) => concat(f(a), flatMap(g1)(f))
+          case Empty => stop(Empty)
+        }
+      }
+    }
+
+    def filter[A](g: Generator[A])(f: A => Boolean): Generator[A] = {
+      g >>= {
+        _ match {
+          case NonEmpty(a, g1) =>
+            val g2 = filter(g1)(f)
+            if(f(a)) stop(NonEmpty(a, g2)) else g2
+          case Empty => stop(Empty)
+        }
       }
     }
 
     def concat[A](ga: Generator[A], gb: Generator[A]): Generator[A] = {
       ga >>= {
-        case NonEmpty(a, ga1) => stop(NonEmpty(a, concat(ga1, gb)))
-        case Empty => gb
+        _ match {
+          case NonEmpty(a, ga1) => stop(NonEmpty(a, concat(ga1, gb)))
+          case Empty => gb
+        }
       }
     }
 
     def fold[A, S](g: Generator[A])(z: S)(f: (S, A) => S): Process[S] = {
       g >>= {
-        case NonEmpty(a, g1) => fold(g1)(f(z, a))(f)
-        case Empty => stop(z)
+        _ match {
+          case NonEmpty(a, g1) => fold(g1)(f(z, a))(f)
+          case Empty => stop(z)
+        }
       }
     }
 
@@ -54,8 +76,10 @@ object Generators {
       output =>
         def loop(g: Generator[A]): Process[Unit] = {
           g >>= {
-            case NonEmpty(a, g1) => output(a) >> loop(g1)
-            case Empty => stop(())
+            _ match {
+              case NonEmpty(a, g1) => output(a) >> loop(g1)
+              case Empty => stop(())
+            }
           }
         }
         loop(g)
