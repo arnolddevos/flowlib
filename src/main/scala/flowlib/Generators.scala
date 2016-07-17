@@ -12,6 +12,7 @@ object Generators {
   implicit class generator[A](g: Generator[A]) {
     def concat[B >: A](gb: Generator[B]) = Generator.concat(g, gb)
     def fold[S](z: S)(f: (S, A) => S) = Generator.fold(g)(z)(f)
+    def foldp[S](z: S)(f: (S, A) => Process[S]) = Generator.foldp(g)(z)(f)
     def sink = Generator.sink(g)
     def +:[B >: A](b: B) = Generator(b, g)
     def map[B](f: A => B) = Generator.map(g)(f)
