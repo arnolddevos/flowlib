@@ -2,7 +2,6 @@ package flowlib
 
 import scala.language.higherKinds
 import ProcessUtil._
-import Producers._
 
 object Flow extends Flow
 
@@ -40,30 +39,4 @@ trait Flow {
 
   implicit def connectSources[S, N, M](implicit c: FlowIn[S, N, M]): FlowIn[S, List[N], List[M]] =
     flowIn((s, ns) => ns map (n => c(s, n)))
-
-  implicit def connectEduction[A, G, S](implicit e: Educible[G, A], c: FlowOut[S, Sink[A] => Sink[A], Sink[A]]): FlowOut[S, G, Process[Unit]] = {
-    flowOut {
-      (s, g) => 
-        val o = c(s, identity)
-        val p = emit(g)
-        p(o)
-    }
-  }
-
-  implicit def connectReduction1[A, R]: FlowIn[Source[A], Reducer[A, R], Process[R]] = {
-    flowIn {
-      (s, f) =>
-        val p = absorb(f)
-        p(s)
-    }
-  }
-
-  implicit def connectReduction2[A, R]: FlowIn[Gate[Nothing, A], Reducer[A, R], Process[R]] = {
-    flowIn {
-      (g, f) =>
-        val s = takeFrom(g)
-        val p = absorb(f)
-        p(s)
-    }
-  }
 }
