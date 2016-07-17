@@ -72,6 +72,15 @@ object Generators {
       }
     }
 
+    def foldp[A, S](g: Generator[A])(z: S)(f: (S, A) => Process[S]): Process[S] = {
+      g >>= {
+        _ match {
+          case NonEmpty(a, g1) => f(z, a) >>= (foldp(g1)(_)(f))
+          case Empty => stop(z)
+        }
+      }
+    }
+
     def sink[A](g: Generator[A]): Sink[A] => Process[Unit] = {
       output =>
         def loop(g: Generator[A]): Process[Unit] = {
