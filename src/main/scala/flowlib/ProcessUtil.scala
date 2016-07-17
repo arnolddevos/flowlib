@@ -22,15 +22,23 @@ object ProcessUtil {
       }
   }
 
+  def foreach[A](la: List[A])( f: A => Process[Any] ): Process[Unit] = {
+    la match {
+      case a :: la1 => f(a) >> foreach(la1)(f)
+      case Nil => stop(())
+    }
+  }
+
   def forever(p: Process[Any]): Process[Nothing] =
     p >> forever(p)
 
-  def foreach[A](la: List[A])( p: A => Process[Any] ): Process[Unit] = {
-    def loop(la: List[A]): Process[Unit] = la match {
-      case a :: la1 => p(a) >> loop(la1)
-      case Nil => stop(())
-    }
-    loop(la)
+  def applyForever[A](f: A => Process[Any]): Source[A] => Process[Nothing] =
+    input => forever(input >>= f)
+
+  def foldForever[S, A](z: S)(f: (S, A) => Process[S]): Source[A] => Process[Nothing] = {
+    input =>
+      def loop(s: S): Process[Nothing] = input >>= (f(s, _)) >>= loop
+      loop(z)
   }
 
   def cat[A]: Source[A] => Sink[A] => Process[Nothing] =
