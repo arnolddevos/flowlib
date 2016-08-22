@@ -2,6 +2,7 @@ package flowlib
 
 import Process._
 import ProcessUtil._
+import transducers.Reducer
 
 object Generators {
 
@@ -12,6 +13,7 @@ object Generators {
   implicit class generator[A](g: Generator[A]) {
     def concat[B >: A](gb: Generator[B]) = Generator.concat(g, gb)
     def fold[S](z: S)(f: (S, A) => S) = Generator.fold(g)(z)(f)
+    def reduce[S](f: Reducer[A, S]) = Generator.reduce(g)(f)
     def foldp[S](z: S)(f: (S, A) => Process[S]) = Generator.foldp(g)(z)(f)
     def sink = Generator.sink(g)
     def +:[B >: A](b: B) = Generator(b, g)
@@ -71,6 +73,20 @@ object Generators {
           case Empty => stop(z)
         }
       }
+    }
+
+    def reduce[A, S](g: Generator[A])(f: Reducer[A, S]): Process[S] = {
+      def loop(g0: Generator[A], s: f.State): Process[S] = {
+        if(f.isReduced(s)) stop(f.complete(s))
+        else
+          g0 >>= {
+            _ match {
+              case NonEmpty(a, g1) => loop(g1, f(s, a))
+              case Empty => stop(f.complete(s))
+            }
+          }
+      }
+      loop(g, f.init)
     }
 
     def foldp[A, S](g: Generator[A])(z: S)(f: (S, A) => Process[S]): Process[S] = {
