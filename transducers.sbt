@@ -1,1 +1,1 @@
-libraryDependencies += "com.bgsig" %% "transducers" % "0.1-14-g00e92f2"
+libraryDependencies += "com.bgsig" %% "transducers" % "0.1-16-gead7914"
