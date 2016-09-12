@@ -2,13 +2,29 @@ package flowlib
 
 import scala.language.higherKinds
 
-import transducers.{Transducers, Views, Operators, AsyncEducers, ContextIsMonad}
+import transducers.{
+  Transducers,
+  Views,
+  Operators,
+  AsyncEducers,
+  Builders,
+  ImmutableStateOperators,
+  ContextIsMonad,
+  Syntax }
 
 import Process._
 import ProcessUtil._
 import Generators._
 
-object Producers extends Transducers with Views with Operators with AsyncEducers with ContextIsMonad {
+object Producers
+  extends Transducers
+  with Views
+  with Operators
+  with AsyncEducers
+  with Builders
+  with ImmutableStateOperators
+  with ContextIsMonad
+  with Syntax {
 
   type Context[+S] = Process[S]
   def inContext[S](s: S) = stop(s)
@@ -50,33 +66,24 @@ object Producers extends Transducers with Views with Operators with AsyncEducers
       loop(f.init)
   }
 
+  type Producer[+A] = Generator[A] // back compatible name for Generator
+  val Producer = Generator
 
   import Series._
 
-  type Producer[+A] = Process[Series[A]]
-
-  object Producer {
-    val empty: Producer[Nothing] = stop(Empty)
-    def apply() = empty
-    def apply[A](a: A, as: Producer[A]): Producer[A] = stop(NonEmpty(a, as))
-  }
-
-  implicit def producerIsEducible[A] = new Educible[Producer[A], A] {
-    def educe[S](as: Producer[A], f: Reducer[A, S]): Process[S] = {
-      def loop(as: Producer[A], sf: f.State ): Process[S] = {
-        if(f.isReduced(sf))
-          stop(f.complete(sf))
+  implicit def generatorIsEducible[A] = new Educible[Generator[A], A] {
+    def educe[S](g: Generator[A], f: Reducer[A, S]): Process[S] = {
+      def loop(g: Generator[A], s: f.State ): Process[S] = {
+        if(f.isReduced(s)) stop(f.complete(s))
         else
-          as >>= {
-            case NonEmpty(a, as1) =>
-              f(sf, a) >>= {
-                sf1 =>
-                  loop(as1, sf1)
-              }
-            case Empty => stop(f.complete(sf))
+          g >>= {
+            _ match {
+              case NonEmpty(a, g1) => f(s, a) >>= (loop(g1, _))
+              case Empty => stop(f.complete(s))
+            }
           }
       }
-      loop(as, f.init)
+      loop(g, f.init)
     }
   }
 }
