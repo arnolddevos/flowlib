@@ -28,6 +28,15 @@ object Generators {
     def apply[A](a: A, g: Generator[A]): Generator[A] = stop(Series(a, g))
     def fromList[A](as: List[A]): Generator[A] = stop(Series.fromList(as))
 
+    def split[A, B](g: Generator[A])(f: (A, Generator[A]) => Generator[B]): Generator[B] = {
+      g >>= {
+        _ match {
+          case NonEmpty(a, g1) => f(a, g1)
+          case Empty => Generator()
+        }
+      }
+    }
+
     def map[A, B](g: Generator[A])(f: A => B): Generator[B] = {
       g map {
         _ match {
@@ -41,7 +50,7 @@ object Generators {
       g >>= {
         _ match {
           case NonEmpty(a, g1) => concat(f(a), flatMap(g1)(f))
-          case Empty => stop(Empty)
+          case Empty => Generator()
         }
       }
     }
@@ -51,8 +60,8 @@ object Generators {
         _ match {
           case NonEmpty(a, g1) =>
             val g2 = filter(g1)(f)
-            if(f(a)) stop(NonEmpty(a, g2)) else g2
-          case Empty => stop(Empty)
+            if(f(a)) Generator(a, g2) else g2
+          case Empty => Generator()
         }
       }
     }
@@ -60,7 +69,7 @@ object Generators {
     def concat[A](ga: Generator[A], gb: Generator[A]): Generator[A] = {
       ga >>= {
         _ match {
-          case NonEmpty(a, ga1) => stop(NonEmpty(a, concat(ga1, gb)))
+          case NonEmpty(a, ga1) => Generator(a, concat(ga1, gb))
           case Empty => gb
         }
       }
