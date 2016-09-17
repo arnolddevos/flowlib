@@ -2,7 +2,7 @@ package flowlib
 
 import Process._
 import ProcessUtil._
-import transducers.Reducer
+import transducers.api.Reducer
 
 object Generators {
 

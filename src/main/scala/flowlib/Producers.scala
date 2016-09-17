@@ -2,15 +2,8 @@ package flowlib
 
 import scala.language.higherKinds
 
-import transducers.{
-  Transducers,
-  Views,
-  Operators,
-  AsyncEducers,
-  Builders,
-  ImmutableStateOperators,
-  ContextIsMonad,
-  Syntax }
+import transducers.{ Transducers, Views, Operators, Builders, ContextIsMonad, Syntax }
+import transducers.lifted.{Educers, StatefulOperators}
 
 import Process._
 import ProcessUtil._
@@ -20,12 +13,12 @@ object Producers
   extends Transducers
   with Views
   with Operators
-  with AsyncEducers
   with Builders
-  with ImmutableStateOperators
   with ContextIsMonad
-  with Syntax {
-
+  with Syntax
+  with Educers
+  with StatefulOperators
+{
   type Context[+S] = Process[S]
   def inContext[S](s: S) = stop(s)
   def mapContext[S, T](p: Process[S])( f: S => T ) = p map f
@@ -46,24 +39,23 @@ object Producers
   def unstream[A, S]( f: Reducer[A, S]): Source[Option[A]] => Process[S] = {
     input =>
       def loop(s: f.State): Process[S] = {
-        if(f.isReduced(s)) stop(f.complete(s))
+        if(f.isReduced(s)) f.complete(s)
         else
           input >>= {
             case Some(a) => f(s, a) >>= loop
-            case None => stop(f.complete(s))
+            case None => f.complete(s)
           }
       }
-      loop(f.init)
+      f.init >>= loop
   }
 
   def absorb[A, S]( f: Reducer[A, S]): Source[A] => Process[S] = {
     input =>
       def loop(s: f.State): Process[S] = {
-        if(f.isReduced(s)) stop(f.complete(s))
-        else
-          input >>= (f(s, _)) >>= loop
+        if(f.isReduced(s)) f.complete(s)
+        else input >>= (f(s, _)) >>= loop
       }
-      loop(f.init)
+      f.init >>= loop
   }
 
   type Producer[+A] = Generator[A] // back compatible name for Generator
@@ -74,16 +66,16 @@ object Producers
   implicit def generatorIsEducible[A] = new Educible[Generator[A], A] {
     def educe[S](g: Generator[A], f: Reducer[A, S]): Process[S] = {
       def loop(g: Generator[A], s: f.State ): Process[S] = {
-        if(f.isReduced(s)) stop(f.complete(s))
+        if(f.isReduced(s)) f.complete(s)
         else
           g >>= {
             _ match {
               case NonEmpty(a, g1) => f(s, a) >>= (loop(g1, _))
-              case Empty => stop(f.complete(s))
+              case Empty => f.complete(s)
             }
           }
       }
-      loop(g, f.init)
+      f.init >>= (loop(g, _))
     }
   }
 }
