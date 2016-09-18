@@ -42,6 +42,8 @@ object Process {
 
   def stop[U](u: U): Process[U] = Complete(u)
 
+  def lazily[U](u: => U): Process[U] = Ready(() => Complete(u))
+
   def fail(message: String, cause: Throwable=null): Process[Nothing] =
     Failed(new RuntimeException(message, cause))
 
