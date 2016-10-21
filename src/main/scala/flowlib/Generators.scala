@@ -26,7 +26,7 @@ object Generators {
     def apply(): Generator[Nothing] = stop(Series())
     def apply[A](a: A): Generator[A] = stop(Series(a))
     def apply[A](a: A, g: Generator[A]): Generator[A] = stop(Series(a, g))
-    def fromList[A](as: List[A]): Generator[A] = stop(Series.fromList(as))
+    def fromList[A](as: List[A]): Generator[A] = continue(stop(Series.fromList(as)))
 
     def split[A, B](g: Generator[A])(f: (A, Generator[A]) => Generator[B]): Generator[B] = {
       g >>= {
@@ -144,7 +144,7 @@ object Generators {
     def apply[A](a: A): Series[A] = NonEmpty(a, stop(Empty))
     def apply[A](a: A, g: Generator[A]): Series[A] = NonEmpty(a, g)
     def fromList[A](as: List[A]): Series[A] = as match {
-      case a :: as1 => NonEmpty(a, continue(stop(fromList(as1))))
+      case a :: as1 => NonEmpty(a, Generator.fromList(as1))
       case Nil => Empty
     }
   }
