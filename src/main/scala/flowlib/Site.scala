@@ -3,10 +3,11 @@ package flowlib
 import annotation.tailrec
 import util.control.NonFatal
 import java.util.concurrent.Executor
+import Executors._
 import Gate.Latch
+import Process._
 
 trait Site {
-  import Process._
 
   // hooks
   def started[U](p0: Process[U]): Unit
@@ -51,9 +52,9 @@ trait Site {
             case Complete(x)      => bounce(step(x))
             case Ready(step1)     => bounce(Sequential(step1(), step))
             case Parallel(p2, p3) => run(p2); bounce(Sequential(p3, step))
-            case Sequential(p2, step2) 
+            case Sequential(p2, step2)
               => bounce(Sequential(p2, (x: Any) => Sequential(step2(x), step)))
-            case _     
+            case _
               => resume(p0, p1, r)(t => push(step(t)))
           }
 
@@ -82,26 +83,34 @@ trait Site {
 
   final def run(p: Process[Any]): Unit = p match {
     case Parallel(p1, p2) => run(p1); run(p2)
-    case _ => 
+    case _ =>
       started(p)
       resume(p, p, killer)(success(p, _))
   }
 }
 
-object EventMachine extends Site {
-  import Executors._
-  import Process._
+object Site {
 
-  val executor = trampoline(fifo)
-  def started[U](p0: Process[U]): Unit = ()
-  def success[U](p0: Process[U], u: U): Unit =
-    println(s"Completed $p0 with: $u")
-  def failure[U](p0: Process[U], e: Throwable, r: Recovery): Unit = {
-    println(s"Failed $p0 with: ${formatException(e)}")
-    run(s"Recovery of $p0" !: continue(r(p0, e)))
+  trait Skeleton extends Site {
+
+    def executor: Executor
+    def log(m: String): Unit
+
+    def started[U](p0: Process[U]): Unit = ()
+    def success[U](p0: Process[U], u: U): Unit =
+      log(s"Completed $p0 with: $u")
+    def failure[U](p0: Process[U], e: Throwable, r: Recovery): Unit = {
+      log(s"Failed $p0 with: ${formatException(e)}")
+      run(s"Recovery of $p0" !: continue(r(p0, e)))
+    }
+    def formatException(e: Throwable) = {
+      val c = e.getCause
+      if(c != null) s"$e cause: $c" else e.toString
+    }
   }
-  def formatException(e: Throwable) = {
-    val c = e.getCause
-    if(c != null) s"$e cause: $c" else e.toString
+
+  def eventMachine(printer: String => Unit = println _): Site = new Skeleton {
+    def log(m: String) = printer(m)
+    def executor = trampoline(fifo)
   }
 }
