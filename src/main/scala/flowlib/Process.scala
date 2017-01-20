@@ -65,6 +65,7 @@ object Process {
     case Parallel(p0, p1) => extractName(p0) + " & " + extractName(p1)
     case Alternative(p0, p1) => extractName(p0) + " | " + extractName(p1)
     case Sequential(p1, _) => extractName(p1) + " >>= ..."
+    case Recoverable(p1, _) => extractName(p1) + " recoverWith ..."
     case _ => "..."
   }
 }
