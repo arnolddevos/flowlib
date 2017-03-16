@@ -1,5 +1,7 @@
 package flowlib
 
+import Transaction._
+
 trait Gate[-S, +T] {
   def take(k: T => Unit): Unit
   def offer(s: S)(k: => Unit): Unit
@@ -7,8 +9,6 @@ trait Gate[-S, +T] {
 }
 
 object Gate {
-  import scala.collection.immutable.Queue
-  import Transaction._
 
   def semaphore(v0: Long) = new Gate[Long, Long] {
     private val state = Transactor(v0)
@@ -38,7 +38,12 @@ object Gate {
 
   def counter(v0: Long) = new Counter {
     private val state = Transactor(v0)
-    import Util.clampLongtoInt
+
+    private def clampLongtoInt(c: Long): Int = {
+      if( c >= Int.MaxValue) Int.MaxValue
+      else if( c <= Int.MinValue) Int.MinValue
+      else c.toInt
+    }
 
     def quota = clampLongtoInt(v0)
     def waiters = state.waiters

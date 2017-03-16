@@ -10,14 +10,6 @@ class BetterQ[T] private ( inner: Queue[T], val length: Int) {
   def isEmpty = length == 0
 }
 
-object Util {
-  def clampLongtoInt(c: Long): Int = {
-    if( c >= Int.MaxValue) Int.MaxValue
-    else if( c <= Int.MinValue) Int.MinValue
-    else c.toInt
-  }
-}
-
 object Executors {
 
   trait StackType[A] {
