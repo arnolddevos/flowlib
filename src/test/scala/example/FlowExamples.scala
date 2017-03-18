@@ -24,16 +24,16 @@ trait FlowExamples {
   def r1: Reducer[A, List[A]] = reducer(List[A]())((la, a: A) => Process.stop(a :: la))
 
   def ps: Process[Any] = (
-    s1 ->: p1 :-> s2 & 
-    c1 ->: p1 :-> s2 & 
-    g1 ->: p1 :-> g1 & 
-    s1 ->: p1 :-> g1 & 
+    s1 ->: p1 :-> s2 &
+    c1 ->: p1 :-> s2 &
+    g1 ->: p1 :-> g1 &
+    s1 ->: p1 :-> g1 &
     s1 ->: c2 ->: p2 :-> s2  &
     c2 ->: p2 :<- s1 :-> (tee[B] :-> s2 :-> sa) &
-    l1 :-> s2 &
-    pr1 :-> c1 & 
-    s1 ->: r1 &
-    g1 ->: r1
+    emit(l1) :-> s2 &
+    emit(pr1) :-> c1 &
+    s1 ->: absorb(r1) &
+    g1 ->: absorb(r1)
   )
 
 }
