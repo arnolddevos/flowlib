@@ -5,7 +5,7 @@ sealed trait Process[+U] extends Process.ProcessOps[U]
 object Process {
 
   // how to recover from an error
-  type Recovery = (Process[Any], Throwable) => Process[Any]
+  type Recovery = (Process[Any], Throwable) => Process[Unit]
 
   // a constant process
   case class Complete[U](u: U) extends Process[U]
@@ -57,6 +57,7 @@ object Process {
     def |[V >: U](p1: Process[V]): Process[V] = Alternative(p0, p1)
     def !:(name: String): Process[U] = Named(p0, name)
     def recoverWith(recovery: Recovery): Process[U] = Recoverable(p0, recovery)
+    def recoverWith(p1: Process[Unit]): Process[U] = Recoverable(p0, (p, t) => p1)
     override def toString = s"Process(${extractName(this)})"
   }
 

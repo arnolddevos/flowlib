@@ -72,4 +72,7 @@ object ProcessUtil {
   }
 
   def parallel[A](ps: List[Process[A]]) = ps reduce ( _ & _ )
+
+  def bracket[R, T](acquire: Process[R])(use: R => Process[T])(dispose: R => Process[Unit]): Process[T] =
+    acquire >>= (r => (use(r) recoverWith dispose(r)) >>= (t => dispose(r) >> stop(t)))
 }
