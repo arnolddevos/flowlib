@@ -29,6 +29,15 @@ object ProcessUtil {
     }
   }
 
+  def traverseProcess[A, B](la: List[A])(f: A => Process[B]): Process[List[B]] = {
+    def loop(la: List[A], lb: List[B]): Process[List[B]] =
+      la match {
+        case a :: la1 => f(a) >>= (b => loop(la1, b :: lb))
+        case Nil => stop(lb.reverse)
+      }
+    loop(la, Nil)
+  }
+
   def forever(p: Process[Any]): Process[Nothing] =
     p >> forever(p)
 
