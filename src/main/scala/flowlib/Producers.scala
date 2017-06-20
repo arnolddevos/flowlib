@@ -47,4 +47,8 @@ object Producers extends API {
       }
       f.init >>= loop
   }
+
+  implicit def streamIsEducible[A] = new Educible[Source[Option[A]], A] {
+    def educe[S](s: Source[Option[A]], f: Reducer[A, S]) = unstream(f)(s)
+  }
 }
