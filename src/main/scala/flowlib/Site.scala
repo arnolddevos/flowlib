@@ -13,6 +13,8 @@ trait Site {
   def started[U](p0: Process[U]): Unit
   def success[U](p0: Process[U], u: U): Unit
   def failure[U](p0: Process[U], e: Throwable, r: Recovery): Unit
+  def poisoned: Boolean
+  def defaultRecovery: Recovery
 
   // async steps are run on this
   def executor: Executor
@@ -20,10 +22,12 @@ trait Site {
   private def resume[V,U](p0: Process[V], p: Process[U], r: Recovery)(k: U => Unit): Unit = {
 
     def async[X](x: X)(k: X => Unit): Unit = {
-      executor execute new Runnable {
-        def run: Unit = {
-          try { k(x) }
-          catch { case NonFatal(e) => failure(p0, e, r) }
+      if(! poisoned) {
+        executor execute new Runnable {
+          def run: Unit = {
+            try { k(x) }
+            catch { case NonFatal(e) => failure(p0, e, r) }
+          }
         }
       }
     }
@@ -39,7 +43,7 @@ trait Site {
     def push(p: Process[U]): Unit = bounce(p)
 
     @tailrec
-    def bounce(p: Process[U]): Unit = if(alive) {
+    def bounce(p: Process[U]): Unit = {
       p match {
 
         // most popular cases it is supposed
@@ -73,27 +77,18 @@ trait Site {
     bounce(p)
   }
 
-  @volatile private var alive = true
-
-  private def killer: Recovery = {
-    (p0, e) =>
-      alive = false
-      stop(())
-  }
-
   final def run(p: Process[Any]): Unit = p match {
     case Parallel(p1, p2) => run(p1); run(p2)
     case _ =>
       started(p)
-      resume(p, p, killer)(success(p, _))
+      resume(p, p, defaultRecovery)(success(p, _))
   }
 }
 
 object Site {
 
-  trait Skeleton extends Site {
+  trait SiteLogAll { this: Site =>
 
-    def executor: Executor
     def log(m: String): Unit
 
     def started[U](p0: Process[U]): Unit = ()
@@ -103,14 +98,51 @@ object Site {
       log(s"Failed $p0 with: ${formatException(e)}")
       run(s"Recovery of $p0" !: continue(r(p0, e)))
     }
-    def formatException(e: Throwable) = {
-      val c = e.getCause
-      if(c != null) s"$e cause: $c" else e.toString
+  }
+
+  trait SiteQuiet  { this: Site =>
+
+    def started[U](p0: Process[U]): Unit = ()
+    def success[U](p0: Process[U], u: U): Unit = ()
+    def failure[U](p0: Process[U], e: Throwable, r: Recovery): Unit = {
+      run(s"Recovery of $p0" !: continue(r(p0, e)))
     }
   }
 
-  def eventMachine(printer: String => Unit = println _): Site = new Skeleton {
-    def log(m: String) = printer(m)
+  trait SiteFailFast { this: Site =>
+
+    def shutdown(e: Throwable): Unit
+
+    @volatile private var poisonV = false
+    final def poisoned = poisonV
+
+    final def poison(e: Throwable) = {
+      poisonV = true
+      shutdown(e)
+    }
+
+    val defaultRecovery: Recovery = {
+      (p0, e) =>
+        poison(e)
+        stop(())
+    }
+  }
+
+  trait SiteNoFail { this: Site =>
+    final def poisoned = false
+    val defaultRecovery: Recovery = (_, _) => stop(())
+  }
+
+  def formatException(e: Throwable) = {
+    val c = e.getCause
+    if(c != null) s"$e cause: $c" else e.toString
+  }
+
+  trait EventMachine extends Site with SiteLogAll with SiteFailFast
+
+  def eventMachine(printer: String => Unit = println _, hook: Throwable => Unit = _ => ()): Site = new EventMachine {
     def executor = trampoline(fifo)
+    def log(m: String) = printer(m)
+    def shutdown(e: Throwable) = hook(e)
   }
 }
