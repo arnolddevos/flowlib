@@ -1,6 +1,6 @@
 package flowlib
 
-import org.scalajs.dom.{setInterval, setTimeout, clearInterval, clearTimeout}
+import org.scalajs.dom.window.{setInterval, setTimeout, clearInterval, clearTimeout}
 
 object Timing {
   /**
@@ -8,7 +8,7 @@ object Timing {
    * delay ms and then complete.
    */
   def after( delay: Double): Process[Unit] = 
-    Process.waitFor(k => setTimeout(k, delay))
+    Process.waitFor(k => setTimeout(() => k(()), delay))
 
   /**
    * Each run, this process will wait until

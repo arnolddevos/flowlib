@@ -1,9 +1,15 @@
 name := "flowlib"
 
-organization := "au.com.langdale"
+organization := "com.bgsig"
 
-version := "0.5"
+version := "0.10"
 
-scalaJSSettings
+unmanagedSourceDirectories in Compile += baseDirectory.value.getParentFile / "src" / "main" / "scala"
 
-libraryDependencies += "org.scala-lang.modules.scalajs" %%% "scalajs-dom" % "0.6"
+enablePlugins(ScalaJSPlugin)
+
+libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "0.9.1"
+
+scalaVersion := "2.12.2" 
+
+scalacOptions += "-P:scalajs:sjsDefinedByDefault"
