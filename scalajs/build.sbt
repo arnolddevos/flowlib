@@ -2,7 +2,9 @@ name := "flowlib"
 
 organization := "com.bgsig"
 
-version := "0.10"
+// version := "0.10"
+
+enablePlugins(DottedGitVersioning)
 
 unmanagedSourceDirectories in Compile += baseDirectory.value.getParentFile / "src" / "main" / "scala"
 
