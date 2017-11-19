@@ -53,3 +53,9 @@ trait Reactors {
     protected def act: Process[Unit]
   }
 }
+
+object Reactors extends Reactors {
+  def backlog = 10
+  def period  = 10l
+  def site    = DefaultSite()
+}
