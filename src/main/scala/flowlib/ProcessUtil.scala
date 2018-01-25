@@ -29,6 +29,14 @@ object ProcessUtil {
     }
   }
 
+  def foreach[A](ia0: => Iterator[A])( f: A => Process[Any] ): Process[Unit] = {
+    def loop(ia: Iterator[A]): Process[Unit] = continue {
+      if(ia.hasNext) { val a = ia.next; f(a) >> loop(ia) }
+      else stop(())
+    }
+    continue(loop(ia0))
+  }
+
   def traverseProcess[A, B](la: List[A])(f: A => Process[B]): Process[List[B]] = {
     def loop(la: List[A], lb: List[B]): Process[List[B]] =
       la match {
